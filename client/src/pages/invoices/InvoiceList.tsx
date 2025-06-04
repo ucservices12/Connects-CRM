@@ -6,23 +6,99 @@ import {
     ChevronLeft, ChevronRight
 } from 'lucide-react';
 import LoadingScreen from '../../components/common/LoadingScreen';
+import { deleteInvoice, getInvoices } from '../../machine/invoice';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+    Chip,
+    Typography,
+    TextField,
+    InputAdornment,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Button,
+    Stack,
+    Pagination
+} from '@mui/material';
+import { toast } from '../../components/common/Toaster';
 
-interface Invoice {
-    id: string;
-    client: {
-        id: string;
-        name: string;
-        company: string;
-    };
-    invoiceNumber: string;
-    issueDate: string;
-    dueDate: string;
-    amount: number;
-    status: 'draft' | 'sent' | 'paid' | 'overdue';
-}
+const getStatusBadge = (status: string) => {
+    switch (status) {
+        case 'paid':
+            return (
+                <Chip
+                    icon={<CheckCircle size={16} color='#00c853' />}
+                    label="Paid"
+                    sx={{
+                        backgroundColor: '#E6F4EA',
+                        color: '#00c853',
+                        paddingX: 1.5,
+                        paddingY: 0.5,
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                        borderRadius: '8px',
+                    }}
+                    size="small"
+                />
+            );
+        case 'sent':
+            return (
+                <Chip
+                    icon={<Clock size={16} color='#1565C0' />}
+                    label="Sent"
+                    sx={{
+                        backgroundColor: '#E3F2FD',
+                        color: '#1565C0',
+                        paddingX: 1.5,
+                        paddingY: 0.5,
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                        borderRadius: '8px',
+                    }}
+                    size="small"
+                />
+            );
+        case 'overdue':
+            return (
+                <Chip
+                    icon={<AlertTriangle size={16} color='#f44336' />}
+                    label="Overdue"
+                    sx={{
+                        backgroundColor: '#FFEBEE',
+                        color: '#f44336',
+                        paddingX: 1.5,
+                        paddingY: 0.5,
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                        borderRadius: '8px',
+                    }}
+                    size="small"
+                />
+            );
+        default:
+            return (
+                <Chip
+                    icon={<FileText size={16} />}
+                    label="Draft"
+                    sx={{
+                        backgroundColor: '#ECEFF1',
+                        color: '#37474F',
+                        paddingX: 1.5,
+                        paddingY: 0.5,
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                        borderRadius: '8px',
+                    }}
+                    size="small"
+                />
+            );
+    }
+};
 
 const InvoiceList = () => {
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const { organization } = useAuth();
+    const [invoices, setInvoices] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -30,46 +106,29 @@ const InvoiceList = () => {
     const itemsPerPage = 10;
 
     useEffect(() => {
-        setTimeout(() => {
-            const mockInvoices: Invoice[] = Array.from({ length: 35 }, (_, i) => {
-                const statuses: Array<'draft' | 'sent' | 'paid' | 'overdue'> = ['draft', 'sent', 'paid', 'overdue'];
-                const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
-                const clients = [
-                    { id: '1', name: 'John Smith', company: 'Acme Corporation' },
-                    { id: '2', name: 'Sarah Johnson', company: 'Globex Industries' },
-                    { id: '3', name: 'Tony Stark', company: 'Stark Enterprises' },
-                    { id: '4', name: 'Bruce Wayne', company: 'Wayne Industries' },
-                    { id: '5', name: 'Albert Wesker', company: 'Umbrella Corp' }
-                ];
-                const randomClient = clients[Math.floor(Math.random() * clients.length)];
-
-                const issueDate = new Date();
-                issueDate.setDate(issueDate.getDate() - Math.floor(Math.random() * 60));
-
-                const dueDate = new Date(issueDate);
-                dueDate.setDate(dueDate.getDate() + 30);
-
-                return {
-                    id: `INV-2025-${(i + 1).toString().padStart(3, '0')}`,
-                    client: randomClient,
-                    invoiceNumber: `INV-2025-${(i + 1).toString().padStart(3, '0')}`,
-                    issueDate: issueDate.toISOString().split('T')[0],
-                    dueDate: dueDate.toISOString().split('T')[0],
-                    amount: Math.floor(Math.random() * 5000) + 500,
-                    status: randomStatus
-                };
-            });
-
-            setInvoices(mockInvoices);
-            setLoading(false);
-        }, 800);
+        const fetchInvoices = async () => {
+            try {
+                const response = await getInvoices(currentPage, itemsPerPage, organization._id);
+                if (response.success === true) {
+                    setInvoices(response?.data);
+                }
+                setLoading(false);
+            } catch (error) {
+                setLoading(false);
+            }
+        };
+        fetchInvoices();
     }, []);
 
     // Filter invoices based on search term and status filter
     const filteredInvoices = invoices.filter(invoice => {
+        const invoiceNo = invoice?.invoiceNo || '';
+        const companyName = invoice?.client?.companyName || '';
+        const search = searchTerm.toLowerCase();
+
         const matchesSearch =
-            invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            invoice.client.company.toLowerCase().includes(searchTerm.toLowerCase());
+            invoiceNo.toLowerCase().includes(search) ||
+            companyName.toLowerCase().includes(search);
 
         const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter;
 
@@ -83,54 +142,30 @@ const InvoiceList = () => {
         currentPage * itemsPerPage
     );
 
-    const handlePageChange = (page: number) => {
+    const handlePageChange = (_: any, page: number) => {
         setCurrentPage(page);
     };
 
-    // Get badge class based on status
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case 'paid':
-                return (
-                    <div className="flex items-center gap-1 badge-success">
-                        <CheckCircle size={14} />
-                        <span>Paid</span>
-                    </div>
-                );
-            case 'sent':
-                return (
-                    <div className="flex items-center gap-1 badge-primary">
-                        <Clock size={14} />
-                        <span>Sent</span>
-                    </div>
-                );
-            case 'overdue':
-                return (
-                    <div className="flex items-center gap-1 badge-danger">
-                        <AlertTriangle size={14} />
-                        <span>Overdue</span>
-                    </div>
-                );
-            default:
-                return (
-                    <div className="flex items-center gap-1 badge-neutral">
-                        <FileText size={14} />
-                        <span>Draft</span>
-                    </div>
-                );
+    const handleDelete = async (id: string) => {
+        try {
+            await deleteInvoice(id);
+            setInvoices(prev => prev.filter(inv => inv._id !== id));
+            toast.success('Invoice deleted successfully!');
+        } catch (error) {
+            toast.error('Failed to delete invoice');
         }
     };
 
     if (loading) {
-        return (
-            <LoadingScreen />
-        );
+        return <LoadingScreen />;
     }
 
     return (
         <>
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-medium">Invoices</h1>
+                <Typography variant="h5">
+                    Invoices
+                </Typography>
                 <Link to="/invoices/create" className="btn-primary">
                     <PlusCircle size={18} />
                     Create Invoice
@@ -138,112 +173,112 @@ const InvoiceList = () => {
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-lg shadow-card p-4 mb-6">
+            <div className="card p-4 rounded-sm mb-6">
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-grow">
-                        <div className="relative">
-                            <Search size={18} className="absolute left-3 top-2.5 text-neutral-400" />
-                            <input
-                                type="text"
-                                className="form-input pl-10"
-                                placeholder="Search by invoice number or client..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
+                        <TextField
+                            fullWidth
+                            variant="outlined"
+                            size="small"
+                            placeholder="Search by invoice number or client..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search size={18} className="text-neutral-400" />
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
                     </div>
-
-                    <div className="flex gap-4">
-                        <div className="w-40">
-                            <div className="relative">
-                                <Filter size={18} className="absolute left-3 top-2.5 text-neutral-400" />
-                                <select
-                                    className="form-input pl-10 appearance-none"
-                                    value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                >
-                                    <option value="all">All Statuses</option>
-                                    <option value="draft">Draft</option>
-                                    <option value="sent">Sent</option>
-                                    <option value="paid">Paid</option>
-                                    <option value="overdue">Overdue</option>
-                                </select>
-                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-500">
-                                        <path d="m6 9 6 6 6-6" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-
-                        <button className="btn-outline">
-                            <Download size={18} />
+                    <div className="flex gap-4 items-center">
+                        <FormControl size="small" sx={{ minWidth: 140 }}>
+                            <InputLabel>Status</InputLabel>
+                            <Select
+                                label="Status"
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                            >
+                                <MenuItem value="all">All Statuses</MenuItem>
+                                <MenuItem value="draft">Draft</MenuItem>
+                                <MenuItem value="sent">Sent</MenuItem>
+                                <MenuItem value="paid">Paid</MenuItem>
+                                <MenuItem value="overdue">Overdue</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <Button
+                            variant="outlined"
+                            startIcon={<Download size={18} />}
+                            sx={{ height: 40 }}
+                        >
                             Export
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
 
             {/* Responsive Invoice List */}
-            <div className="bg-white rounded-lg shadow-card overflow-hidden">
+            <div className="overflow-hidden card p-0 rounded-none">
                 {/* Desktop Table */}
                 <div className="hidden md:block overflow-x-auto">
                     <table className="w-full">
                         <thead>
-                            <tr className="bg-neutral-50 border-b border-neutral-200">
+                            <tr className="bg-[#616161] text-white text-sm font-normal border-b border-neutral-200">
                                 <th className="py-3 px-4 text-left">Invoice #</th>
                                 <th className="py-3 px-4 text-left">Client</th>
                                 <th className="py-3 px-4 text-left">Issue Date</th>
                                 <th className="py-3 px-4 text-left">Due Date</th>
                                 <th className="py-3 px-4 text-right">Amount</th>
-                                <th className="py-3 px-4 text-left">Status</th>
+                                <th className="py-3 px-4 text-center">Status</th>
                                 <th className="py-3 px-4 text-center">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {paginatedInvoices.map((invoice) => (
-                                <tr key={invoice.id} className="border-b border-neutral-200 hover:bg-neutral-50">
-                                    <td className="py-3 px-4">
+                        <tbody className="text-sm">
+                            {paginatedInvoices.map((invoice, index) => (
+                                <tr key={index} className="border-b border-neutral-200 hover:bg-neutral-50">
+                                    <td className="p-2">
                                         <Link
-                                            to={`/invoices/${invoice.id}`}
+                                            to={`/invoices/${invoice?._id}`}
                                             className="text-primary-600 hover:underline"
                                         >
-                                            {invoice.invoiceNumber}
+                                            {invoice?.invoiceNo}
                                         </Link>
                                     </td>
                                     <td className="py-3 px-4">
-                                        <div className="font-medium">{invoice.client.company}</div>
-                                        <div className="text-sm text-neutral-500">{invoice.client.name}</div>
+                                        <div className="font-medium">{invoice?.client?.companyName}</div>
+                                        <div className="text-sm text-neutral-500">{invoice?.client?.name}</div>
                                     </td>
                                     <td className="py-3 px-4">
-                                        {new Date(invoice.issueDate).toLocaleDateString('en-IN')}
+                                        {new Date(invoice?.createdAt).toLocaleDateString('en-IN')}
                                     </td>
                                     <td className="py-3 px-4">
-                                        {new Date(invoice.dueDate).toLocaleDateString('en-IN')}
+                                        {new Date(invoice?.dueDate).toLocaleDateString('en-IN')}
                                     </td>
                                     <td className="py-3 px-4 text-right font-medium">
-                                        ₹{invoice.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                        ₹{invoice?.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                     </td>
-                                    <td className="py-3 px-4">
-                                        {getStatusBadge(invoice.status)}
+                                    <td className="py-3 px-4 text-center">
+                                        {getStatusBadge(invoice?.status)}
                                     </td>
                                     <td className="py-3 px-4">
                                         <div className="flex justify-center gap-2">
                                             <Link
-                                                to={`/invoices/${invoice.id}`}
+                                                to={`/invoices/${invoice?.invoiceNo}`}
                                                 className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
                                                 title="View"
                                             >
                                                 <Eye size={18} />
                                             </Link>
                                             <Link
-                                                to={`/invoices/${invoice.id}/edit`}
+                                                to={`/invoices/${invoice?._id}/edit`}
                                                 className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
                                                 title="Edit"
                                             >
                                                 <Edit size={18} />
                                             </Link>
                                             <button
+                                                onClick={() => handleDelete(invoice?._id)}
                                                 className="p-1 text-neutral-500 hover:text-danger-600 hover:bg-neutral-100 rounded"
                                                 title="Delete"
                                             >
@@ -272,40 +307,41 @@ const InvoiceList = () => {
                             No invoices found matching your criteria
                         </div>
                     )}
-                    {paginatedInvoices.map((invoice) => (
-                        <div key={invoice.id} className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 flex flex-col gap-2 shadow-sm">
+                    {paginatedInvoices.map((invoice, index) => (
+                        <div key={index} className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 flex flex-col gap-2 shadow-sm">
                             <div className="flex justify-between items-center">
                                 <div className="font-semibold text-primary-700">
-                                    <Link to={`/invoices/${invoice.id}`}>{invoice.invoiceNumber}</Link>
+                                    <Link to={`/invoices/${invoice?._id}`}>{invoice?.invoiceNo}</Link>
                                 </div>
                                 <div>{getStatusBadge(invoice.status)}</div>
                             </div>
-                            <div className="text-sm text-neutral-700">{invoice.client.company}</div>
-                            <div className="text-xs text-neutral-500">{invoice.client.name}</div>
+                            <div className="text-sm text-neutral-700">{invoice?.client.companyName}</div>
+                            <div className="text-xs text-neutral-500">{invoice?.client?.name}</div>
                             <div className="flex justify-between text-xs mt-2">
-                                <span>Issue: {new Date(invoice.issueDate).toLocaleDateString('en-IN')}</span>
-                                <span>Due: {new Date(invoice.dueDate).toLocaleDateString('en-IN')}</span>
+                                <span>Issue: {new Date(invoice?.createdAt).toLocaleDateString('en-IN')}</span>
+                                <span>Due: {new Date(invoice?.dueDate).toLocaleDateString('en-IN')}</span>
                             </div>
                             <div className="flex justify-between items-center mt-2">
                                 <span className="font-medium text-lg text-green-700">
-                                    ₹{invoice.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    ₹{invoice?.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                 </span>
                                 <div className="flex gap-2">
                                     <Link
-                                        to={`/invoices/${invoice.id}`}
+                                        to={`/invoices/${invoice?.invoiceNo}`}
                                         className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
                                         title="View"
                                     >
                                         <Eye size={18} />
                                     </Link>
                                     <Link
-                                        to={`/invoices/${invoice.id}/edit`}
+                                        to={`/invoices/${invoice?._id}/edit`}
                                         className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
                                         title="Edit"
                                     >
                                         <Edit size={18} />
                                     </Link>
                                     <button
+                                        onClick={() => handleDelete(invoice?._id)}
                                         className="p-1 text-neutral-500 hover:text-danger-600 hover:bg-neutral-100 rounded"
                                         title="Delete"
                                     >
@@ -323,63 +359,17 @@ const InvoiceList = () => {
                         <div className="text-sm text-neutral-500">
                             Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredInvoices.length)} of {filteredInvoices.length} invoices
                         </div>
-
-                        <div className="flex gap-2">
-                            <button
-                                className="p-2 rounded hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                onClick={() => handlePageChange(currentPage - 1)}
-                                disabled={currentPage === 1}
-                            >
-                                <ChevronLeft size={18} />
-                            </button>
-
-                            {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                .filter(page =>
-                                    page === 1 ||
-                                    page === totalPages ||
-                                    (page >= currentPage - 1 && page <= currentPage + 1)
-                                )
-                                .map((page, index, array) => {
-                                    // Add ellipsis
-                                    if (index > 0 && array[index - 1] !== page - 1) {
-                                        return (
-                                            <React.Fragment key={`ellipsis-${page}`}>
-                                                <span className="p-2">...</span>
-                                                <button
-                                                    className={`w-10 h-10 rounded ${currentPage === page
-                                                        ? 'bg-primary-600 text-white'
-                                                        : 'hover:bg-neutral-100'
-                                                        }`}
-                                                    onClick={() => handlePageChange(page)}
-                                                >
-                                                    {page}
-                                                </button>
-                                            </React.Fragment>
-                                        );
-                                    }
-
-                                    return (
-                                        <button
-                                            key={page}
-                                            className={`w-10 h-10 rounded ${currentPage === page
-                                                ? 'bg-primary-600 text-white'
-                                                : 'hover:bg-neutral-100'
-                                                }`}
-                                            onClick={() => handlePageChange(page)}
-                                        >
-                                            {page}
-                                        </button>
-                                    );
-                                })}
-
-                            <button
-                                className="p-2 rounded hover:bg-neutral-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                onClick={() => handlePageChange(currentPage + 1)}
-                                disabled={currentPage === totalPages}
-                            >
-                                <ChevronRight size={18} />
-                            </button>
-                        </div>
+                        <Stack spacing={2} direction="row">
+                            <Pagination
+                                count={totalPages}
+                                page={currentPage}
+                                onChange={handlePageChange}
+                                color="primary"
+                                shape="rounded"
+                                showFirstButton
+                                showLastButton
+                            />
+                        </Stack>
                     </div>
                 )}
             </div>

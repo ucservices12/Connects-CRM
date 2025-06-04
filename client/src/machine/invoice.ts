@@ -2,17 +2,19 @@ import axios from 'axios';
 
 const API = "http://localhost:5000/api/v1/invoices";
 
-// Helper to get auth headers
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-export const getInvoices = async (page: number, limit: number) => {
+export const getInvoices = async (page, limit, orgId) => {
+    if (!orgId) throw new Error("orgId is required");
     try {
-        const response = await axios.get(`${API}?page=${page}&limit=${limit}`, {
-            headers: getAuthHeaders()
-        });
+        const response = await axios.get(
+            `${API}?orgId=${orgId}&page=${page}&limit=${limit}`,
+            { headers: getAuthHeaders() }
+        );
+        console.log("getAllInvoices =>", response?.data?.data);
         return response.data;
     } catch (error) {
         console.error("Error fetching invoices:", error);
@@ -25,6 +27,7 @@ export const getInvoiceById = async (id: string) => {
         const response = await axios.get(`${API}/${id}`, {
             headers: getAuthHeaders()
         });
+        console.log("getInvoiceById =>", response?.data?.data)
         return response.data;
     } catch (error) {
         console.error("Error fetching invoice by ID:", error);
@@ -35,10 +38,13 @@ export const getInvoiceById = async (id: string) => {
 export const createInvoice = async (invoiceData: any) => {
     try {
         const response = await axios.post(API, invoiceData, {
-            headers: getAuthHeaders()
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            }
         });
         console.log("Invoice created successfully:", response.data);
-        return response.data;
+        return response.data.data;
     } catch (error) {
         console.error("Error creating invoice:", error);
         throw error;

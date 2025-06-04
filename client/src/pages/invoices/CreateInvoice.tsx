@@ -5,221 +5,217 @@ import DatePicker from '../../components/common/DatePicker';
 import ClientSelector from '../../components/invoices/ClientSelector';
 import { createInvoice } from '../../machine/invoice';
 import { useAuth } from '../../contexts/AuthContext';
+import { toast } from '../../components/common/Toaster';
 
-// Client type
-type Client = {
-    id: string;
-    company: string;
-    name: string;
-    address: string;
-    email: string;
-    phone?: string;
-};
-
-// Invoice item type
-type InvoiceItem = {
-    id: string;
-    description: string;
-    quantity: number;
-    rate: number;
-};
-
-// Invoice status type
-type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue' | 'Cancelled';
-
-// Invoice type
-interface Invoice {
-    id: string;
-    clientId: string;
-    invoiceNo: string;
-    issueDate: Date;
-    dueDate: Date;
-    items: InvoiceItem[];
-    notes: string;
-    tax: number;
-    discount: number;
-    status: InvoiceStatus;
-    terms: string;
-}
-
-// Initial clients (unique IDs, all fields present)
-const initialClients: Client[] = [
-    { id: '1', company: 'Acme Corp', name: 'Rahul Sharma', address: '123 Main St, Mumbai, Maharashtra, 400001, India', email: 'acme@example.com', phone: '9999999999' },
-    { id: '2', company: 'Globex Ltd', name: 'Priya Singh', address: '456 Market Rd, Pune, Maharashtra, 411001, India', email: 'globex@example.com', phone: '8888888888' },
-    { id: '3', company: 'Acme Corporation', name: 'John Smith', address: '789 Park Ave, Delhi, Delhi, 110001, India', email: 'john@acme.com', phone: '7777777777' },
-    { id: '4', company: 'Globex Industries', name: 'Sarah Johnson', address: '321 River Rd, Bangalore, Karnataka, 560001, India', email: 'sarah@globex.com', phone: '6666666666' },
-    { id: '5', company: 'Stark Enterprises', name: 'Tony Stark', address: '10880 Malibu Point, California, CA, 90265, USA', email: 'tony@stark.com', phone: '5555555555' },
-    { id: '6', company: 'Wayne Industries', name: 'Bruce Wayne', address: '1007 Mountain Dr, Gotham, NY, 10001, USA', email: 'bruce@wayne.com', phone: '4444444444' },
-    { id: '7', company: 'Umbrella Corp', name: 'Albert Wesker', address: 'Umbrella HQ, Raccoon City, Ohio, 43001, USA', email: 'wesker@umbrella.com', phone: '3333333333' },
-];
-
-// Default invoice item
-const defaultItem = (): InvoiceItem => ({
+// Helpers
+const defaultAddress = { street: '', city: '', state: '', zipCode: '', country: '' };
+const defaultItem = () => ({
     id: Date.now().toString() + Math.random(),
     description: '',
     quantity: 1,
     rate: 0,
 });
 
-const CreateInvoice: React.FC = () => {
+const initialClients = [
+    {
+        id: '1',
+        company: 'Acme Corp',
+        name: 'Rahul Sharma',
+        address: { street: '123 Main St', city: 'Mumbai', state: 'Maharashtra', zipCode: '400001', country: 'India' },
+        email: 'acme@example.com',
+        phone: '9999999999',
+    },
+    {
+        id: '2',
+        company: 'Wipro Technology',
+        name: 'Rohan kumar',
+        address: { street: '164 tech park', city: 'pune', state: 'Maharashtra', zipCode: '400001', country: 'India' },
+        email: 'tech@gmail.com',
+        phone: '9568956565',
+    },
+];
 
+const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+
+const CreateInvoice = () => {
     const navigate = useNavigate();
-    const { user } = useAuth();
-    const [clients, setClients] = useState<Client[]>(initialClients);
+    const { organization, user } = useAuth();
+
+    // State
+    const [clients, setClients] = useState(initialClients);
     const [showAddClient, setShowAddClient] = useState(false);
-    const [newClient, setNewClient] = useState<Omit<Client, 'id'>>({
-        company: '',
-        name: '',
-        address: '',
-        email: '',
-        phone: '',
-    });
-
-    console.log("Organization ID:", user?.organization);
-    console.log("User ID:", user?._id);
-
-    const [invoice, setInvoice] = useState<Invoice>({
-        id: '',
+    const [newClient, setNewClient] = useState({ company: '', name: '', address: { ...defaultAddress }, email: '', phone: '' });
+    const [invoice, setInvoice] = useState({
         clientId: '',
         invoiceNo: `INV-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
         issueDate: new Date(),
-        dueDate: (() => {
-            const d = new Date();
-            d.setDate(d.getDate() + 30);
-            return d;
-        })(),
+        dueDate: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d; })(),
         items: [defaultItem()],
         notes: '',
-        tax: 0,
+        sGST: 0,
         discount: 0,
         status: 'Draft',
         terms: '',
+        paidAmount: 0,
     });
 
+    // Error state
+    const [errors, setErrors] = useState({});
+    const [clientAddError, setClientAddError] = useState('');
+
     // Calculations
+    const cGST = invoice.sGST;
     const subtotal = invoice.items.reduce((sum, item) => sum + item.quantity * item.rate, 0);
-    const taxAmount = (subtotal * invoice.tax) / 100;
+    const sgstAmount = (subtotal * invoice.sGST) / 100;
+    const cgstAmount = (subtotal * cGST) / 100;
+    const taxAmount = sgstAmount + cgstAmount;
     const discountAmount = (subtotal * invoice.discount) / 100;
     const grandTotal = subtotal + taxAmount - discountAmount;
-    const formatRupees = (amount: number) => `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    const paidAmount = invoice.paidAmount || 0;
+    const balanceDue = Math.max(grandTotal - paidAmount, 0);
+    const formatRupees = amount => `₹${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
     // Handlers
-    const handleField = (field: keyof Invoice, value: any) => {
-        setInvoice(inv => ({ ...inv, [field]: value ?? 0 }));
-    };
-
-    const handleItem = (id: string, field: keyof InvoiceItem, value: string | number) => {
+    const handleField = (field, value) => setInvoice(inv => ({ ...inv, [field]: value ?? 0 }));
+    const handleItem = (id, field, value) =>
         setInvoice(inv => ({
             ...inv,
             items: inv.items.map(item =>
-                item.id === id
-                    ? { ...item, [field]: field === 'description' ? value : Number(value) }
-                    : item
+                item.id === id ? { ...item, [field]: field === 'description' ? value : Number(value) } : item
             ),
         }));
-    };
-
-    const addItem = () => setInvoice(inv => ({
-        ...inv,
-        items: [...inv.items, defaultItem()],
-    }));
-
-    const removeItem = (id: string) => {
+    const addItem = () => setInvoice(inv => ({ ...inv, items: [...inv.items, defaultItem()] }));
+    const removeItem = id =>
         setInvoice(inv => ({
             ...inv,
             items: inv.items.length > 1 ? inv.items.filter(item => item.id !== id) : inv.items,
         }));
-    };
 
     // Add new client
     const handleAddClient = () => {
-        if (!newClient.company.trim() || !newClient.name.trim() || !newClient.email.trim()) {
-            alert("Company, Name, and Email are required.");
+        let error = '';
+        if (!newClient.company.trim()) error = 'Company is required.';
+        else if (!newClient.name.trim()) error = 'Client name is required.';
+        else if (!newClient.email.trim()) error = 'Client email is required.';
+        else if (!emailRegex.test(newClient.email)) error = 'Please enter a valid email address.';
+        if (error) {
+            setClientAddError(error);
             return;
         }
-        // Email validation (simple)
-        if (!/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(newClient.email)) {
-            alert("Please enter a valid email address.");
-            return;
-        }
-        const clientToAdd: Client = {
-            id: Date.now().toString(),
-            ...newClient,
-        };
+        setClientAddError('');
+        const clientToAdd = { id: Date.now().toString(), ...newClient, address: { ...newClient.address } };
         setClients(prev => [...prev, clientToAdd]);
         setInvoice(inv => ({ ...inv, clientId: clientToAdd.id }));
-        setNewClient({ company: '', name: '', address: '', email: '', phone: '' });
+        setNewClient({ company: '', name: '', address: { ...defaultAddress }, email: '', phone: '' });
         setShowAddClient(false);
     };
 
-    // Submit handler
-    const handleSubmit = async (e: React.FormEvent, isDraft = true) => {
-        e.preventDefault();
-        const selectedClient = clients.find(c => c.id === invoice.clientId);
-        if (!selectedClient || !user?.organization) {
-            alert('Please select a client and organization.');
-            return;
+    // Strong validation for invoice
+    const validateInvoice = (selectedClient) => {
+        const newErrors = {};
+        if (!organization || !organization._id) {
+            newErrors.organization = 'Organization is not loaded. Please refresh the page or contact support.';
+        }
+        if (!selectedClient) {
+            newErrors.clientId = 'Please select a client.';
+        } else {
+            if (!selectedClient.company || !selectedClient.company.trim()) {
+                newErrors.clientCompany = 'Client company name is required.';
+            }
+            if (!selectedClient.name || !selectedClient.name.trim()) {
+                newErrors.clientName = 'Client name is required.';
+            }
+            if (!selectedClient.email || !emailRegex.test(selectedClient.email)) {
+                newErrors.clientEmail = 'Client email is required and must be valid.';
+            }
         }
         if (!invoice.invoiceNo.trim()) {
-            alert('Invoice number is required.');
-            return;
+            newErrors.invoiceNo = 'Invoice number is required.';
         }
-        // Prepare address fields (split by comma)
-        const addressString = selectedClient.address || '';
-        const [street = '', city = '', state = '', zipCode = '', country = ''] = addressString.split(',').map(s => s.trim());
+        if (!invoice.issueDate || isNaN(new Date(invoice.issueDate).getTime())) {
+            newErrors.issueDate = 'Valid issue date is required.';
+        }
+        if (!invoice.dueDate || isNaN(new Date(invoice.dueDate).getTime())) {
+            newErrors.dueDate = 'Valid due date is required.';
+        }
+        if (
+            !invoice.items.length ||
+            invoice.items.some(item =>
+                !item.description ||
+                item.description.trim().length === 0 ||
+                item.quantity < 1 ||
+                item.rate < 0 ||
+                isNaN(item.quantity) ||
+                isNaN(item.rate)
+            )
+        ) {
+            newErrors.items = 'Please fill all invoice items with valid values (description, quantity > 0, rate >= 0).';
+        }
+        if (invoice.discount < 0 || invoice.discount > 100) {
+            newErrors.discount = 'Discount must be between 0 and 100.';
+        }
+        if (invoice.sGST < 0 || invoice.sGST > 100) {
+            newErrors.sGST = 'SGST must be between 0 and 100.';
+        }
+        if (invoice.paidAmount < 0) {
+            newErrors.paidAmount = 'Paid amount cannot be negative.';
+        }
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
 
-        // Validate items
-        if (invoice.items.length === 0 || invoice.items.some(item => !item.description || item.quantity < 1 || item.rate < 0)) {
-            alert('Please fill all invoice items with valid values.');
-            return;
-        }
+    // Submit handler
+    const handleSubmit = async (e, isDraft = true) => {
+        e.preventDefault();
+        const selectedClient = clients.find(c => c.id === invoice.clientId);
 
-        // Validate client email
-        if (!selectedClient.email || !/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(selectedClient.email)) {
-            alert('Client email is required and must be valid.');
-            return;
-        }
+        if (!validateInvoice(selectedClient)) return;
 
         const invoiceData = {
-            organizationId: (user?.organization).toString(),
+            orgId: organization._id,
             client: {
+                companyName: selectedClient.company,
                 name: selectedClient.name,
                 email: selectedClient.email,
                 phone: selectedClient.phone || '',
-                address: {
-                    street,
-                    city,
-                    state,
-                    zipCode,
-                    country,
-                }
+                address: { ...selectedClient.address },
             },
             invoiceNo: invoice.invoiceNo,
             items: invoice.items.map(item => ({
                 description: item.description,
                 quantity: item.quantity,
                 rate: item.rate,
-                amount: item.quantity * item.rate
+                amount: item.quantity * item.rate,
             })),
             totalAmount: subtotal,
-            tax: invoice.tax,
+            sGST: invoice.sGST,
+            cGST,
+            tax: invoice.sGST + cGST,
             discount: invoice.discount,
-            grandTotal: grandTotal,
+            grandTotal,
             status: isDraft ? 'Draft' : invoice.status,
             dueDate: invoice.dueDate,
             notes: invoice.notes,
             terms: invoice.terms,
-            sentAt: null,
-            paidAt: null,
+            sentAt: '',
+            paidAt: '',
+            paidAmount: invoice.paidAmount,
             createdBy: user?._id || '',
         };
-        console.log("Submitting Invoice Data:", invoiceData);
-        await createInvoice(invoiceData);
-        navigate('/invoices/list');
+
+        try {
+            await createInvoice(invoiceData);
+            navigate('/invoices/list');
+            toast.success("Create New Invoice");
+        } catch {
+            setErrors({ submit: 'Failed to create invoice. Please try again.' });
+        }
     };
 
+    // Render
     return (
         <div className="sm:space-y-6 space-y-4">
+            {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between sm:items-center">
                 <div className="flex items-center mb-4 sm:mb-0">
                     <button onClick={() => navigate(-1)} className="mr-4 p-2 rounded-full hover:bg-neutral-100">
@@ -237,15 +233,20 @@ const CreateInvoice: React.FC = () => {
                 </div>
             </div>
 
-            <form onSubmit={e => handleSubmit(e, true)} className="card space-y-8">
+            {/* Form */}
+            <form onSubmit={e => handleSubmit(e, true)} className="card sm:p-6 p-4 space-y-3">
+                {/* Client & Invoice Info */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="form-group">
-                        <label className="form-label">Client <span className="text-danger-600">*</span></label>
+                        <label className="form-label">
+                            Client <span className="text-danger-600">*</span>
+                        </label>
                         <ClientSelector
                             selectedClient={invoice.clientId}
                             onChange={val => handleField('clientId', val)}
                             clients={clients}
                         />
+                        {errors.clientId && <div className="text-red-600 text-sm mt-1">{errors.clientId}</div>}
                         <button
                             type="button"
                             className="mt-2 flex items-center text-primary-600 hover:underline text-sm"
@@ -256,77 +257,75 @@ const CreateInvoice: React.FC = () => {
                         </button>
                         {showAddClient && (
                             <div className="mt-3 p-3 rounded bg-neutral-50 border">
-                                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                                    <div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <input
+                                        type="text"
+                                        className="form-input w-full"
+                                        placeholder="Company Name"
+                                        value={newClient.company}
+                                        onChange={e => setNewClient(nc => ({ ...nc, company: e.target.value }))}
+                                        required
+                                    />
+                                    <input
+                                        type="text"
+                                        className="form-input w-full"
+                                        placeholder="Client Name"
+                                        value={newClient.name}
+                                        onChange={e => setNewClient(nc => ({ ...nc, name: e.target.value }))}
+                                        required
+                                    />
+                                    <input
+                                        type="email"
+                                        className="form-input w-full"
+                                        placeholder="Email"
+                                        value={newClient.email}
+                                        onChange={e => setNewClient(nc => ({ ...nc, email: e.target.value }))}
+                                        required
+                                    />
+                                    <input
+                                        type="text"
+                                        className="form-input w-full"
+                                        placeholder="Phone"
+                                        value={newClient.phone}
+                                        onChange={e => setNewClient(nc => ({ ...nc, phone: e.target.value }))}
+                                    />
+                                    {/* Address fields */}
+                                    {['street', 'city', 'state', 'zipCode', 'country'].map(field => (
                                         <input
+                                            key={field}
                                             type="text"
-                                            className="form-input w-full"
-                                            placeholder="Company Name"
-                                            value={newClient.company}
-                                            onChange={e => setNewClient(nc => ({ ...nc, company: e.target.value }))}
-                                            required
+                                            className="form-input"
+                                            placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                                            value={newClient.address[field]}
+                                            onChange={e =>
+                                                setNewClient(nc => ({
+                                                    ...nc,
+                                                    address: { ...nc.address, [field]: e.target.value },
+                                                }))
+                                            }
                                         />
-                                    </div>
-                                    <div>
-                                        <input
-                                            type="text"
-                                            className="form-input w-full"
-                                            placeholder="Client Name"
-                                            value={newClient.name}
-                                            onChange={e => setNewClient(nc => ({ ...nc, name: e.target.value }))}
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <input
-                                            type="email"
-                                            className="form-input w-full"
-                                            placeholder="Email"
-                                            value={newClient.email}
-                                            onChange={e => setNewClient(nc => ({ ...nc, email: e.target.value }))}
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <input
-                                            type="text"
-                                            className="form-input w-full"
-                                            placeholder="Phone"
-                                            value={newClient.phone}
-                                            onChange={e => setNewClient(nc => ({ ...nc, phone: e.target.value }))}
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <textarea
-                                            className="form-input w-full"
-                                            placeholder="Address (comma separated: street, city, state, zip, country)"
-                                            value={newClient.address}
-                                            onChange={e => setNewClient(nc => ({ ...nc, address: e.target.value }))}
-                                        />
-                                    </div>
+                                    ))}
                                 </div>
-                                <div className="flex gap-2 mt-2">
-                                    <button
-                                        type="button"
-                                        className="btn-primary btn-sm"
-                                        onClick={handleAddClient}
-                                    >
-                                        Add
+                                {clientAddError && <div className="text-red-600 text-sm mt-2">{clientAddError}</div>}
+                                <div className="flex gap-2 mt-4">
+                                    <button type="button" className="btn-primary btn-sm" onClick={handleAddClient}>
+                                        Add Client
                                     </button>
-                                    <button
-                                        type="button"
-                                        className="btn-outline btn-sm"
-                                        onClick={() => setShowAddClient(false)}
-                                    >
+                                    <button type="button" className="btn-outline btn-sm" onClick={() => setShowAddClient(false)}>
                                         Cancel
                                     </button>
                                 </div>
                             </div>
                         )}
+                        {errors.clientCompany && <div className="text-red-600 text-sm mt-1">{errors.clientCompany}</div>}
+                        {errors.clientName && <div className="text-red-600 text-sm mt-1">{errors.clientName}</div>}
+                        {errors.clientEmail && <div className="text-red-600 text-sm mt-1">{errors.clientEmail}</div>}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="form-group">
-                            <label className="form-label">Invoice # <span className="text-danger-600">*</span></label>
+                            <label className="form-label">
+                                Invoice # <span className="text-danger-600">*</span>
+                            </label>
                             <input
                                 type="text"
                                 className="form-input"
@@ -334,32 +333,25 @@ const CreateInvoice: React.FC = () => {
                                 onChange={e => handleField('invoiceNo', e.target.value)}
                                 required
                             />
+                            {errors.invoiceNo && <div className="text-red-600 text-sm mt-1">{errors.invoiceNo}</div>}
                         </div>
                         <div className="form-group">
                             <label className="form-label">Issue Date</label>
-                            <DatePicker
-                                selectedDate={invoice.issueDate}
-                                onChange={date => handleField('issueDate', date)}
-                            />
+                            <DatePicker selectedDate={invoice.issueDate} onChange={date => handleField('issueDate', date)} />
+                            {errors.issueDate && <div className="text-red-600 text-sm mt-1">{errors.issueDate}</div>}
                         </div>
                         <div className="form-group">
                             <label className="form-label">Due Date</label>
-                            <DatePicker
-                                selectedDate={invoice.dueDate}
-                                onChange={date => handleField('dueDate', date)}
-                            />
+                            <DatePicker selectedDate={invoice.dueDate} onChange={date => handleField('dueDate', date)} />
+                            {errors.dueDate && <div className="text-red-600 text-sm mt-1">{errors.dueDate}</div>}
                         </div>
                     </div>
                 </div>
 
                 {/* Invoice Status */}
-                <div className="form-group">
+                <div className="form-group max-w-xs">
                     <label className="form-label">Status</label>
-                    <select
-                        className="form-input"
-                        value={invoice.status}
-                        onChange={e => handleField('status', e.target.value as InvoiceStatus)}
-                    >
+                    <select className="form-input" value={invoice.status} onChange={e => handleField('status', e.target.value)}>
                         <option value="Draft">Draft</option>
                         <option value="Sent">Sent</option>
                         <option value="Paid">Paid</option>
@@ -370,21 +362,29 @@ const CreateInvoice: React.FC = () => {
 
                 {/* Invoice Items */}
                 <div className="mb-8">
-                    <h3 className="text-lg font-medium mb-3">Invoice Items <span className="text-danger-600">*</span></h3>
+                    <h3 className="text-lg font-medium mb-3">
+                        Invoice Items <span className="text-danger-600">*</span>
+                    </h3>
+                    {errors.items && <div className="text-red-600 text-sm mb-2">{errors.items}</div>}
                     <div className="flex flex-col gap-4">
                         <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-sm text-neutral-500">
-                            <div className="col-span-5">Description</div>
+                            <div className="col-span-1">SR NO</div>
+                            <div className="col-span-4">Description</div>
                             <div className="col-span-2">Quantity</div>
                             <div className="col-span-2">Rate</div>
                             <div className="col-span-2 text-right">Amount</div>
                             <div className="col-span-1 text-right">Action</div>
                         </div>
-                        {invoice.items.map(item => (
+                        {invoice.items.map((item, index) => (
                             <div
                                 key={item.id}
                                 className="flex flex-col sm:grid grid-cols-12 gap-2 items-center bg-neutral-50 rounded-lg p-2"
                             >
-                                <div className="col-span-5 w-full">
+                                <div className="sm:col-span-1 w-full flex sm:block justify-between items-center">
+                                    <span className="sm:hidden text-xs text-neutral-500 mr-2">SR NO</span>
+                                    <span>{index + 1}</span>
+                                </div>
+                                <div className="sm:col-span-4 col-span-5 w-full">
                                     <input
                                         type="text"
                                         className="form-input w-full"
@@ -394,7 +394,7 @@ const CreateInvoice: React.FC = () => {
                                         required
                                     />
                                 </div>
-                                <div className="col-span-2 w-full flex sm:block justify-between items-center">
+                                <div className="sm:col-span-2 col-span-2 w-full flex sm:block justify-between items-center">
                                     <span className="sm:hidden text-xs text-neutral-500 mr-2">Qty</span>
                                     <input
                                         type="number"
@@ -405,7 +405,7 @@ const CreateInvoice: React.FC = () => {
                                         required
                                     />
                                 </div>
-                                <div className="col-span-2 w-full flex sm:block justify-between items-center">
+                                <div className="sm:col-span-2 col-span-2 w-full flex sm:block justify-between items-center">
                                     <span className="sm:hidden text-xs text-neutral-500 mr-2">Rate</span>
                                     <div className="relative w-full">
                                         <span className="absolute left-3 top-2">₹</span>
@@ -420,17 +420,17 @@ const CreateInvoice: React.FC = () => {
                                         />
                                     </div>
                                 </div>
-                                <div className="col-span-2 w-full flex sm:block justify-between items-center text-right">
+                                <div className="sm:col-span-2 col-span-2 w-full flex sm:block justify-between items-center text-right">
                                     <span className="sm:hidden text-xs text-neutral-500 mr-2">Amount</span>
                                     <span className="block w-full">{formatRupees(item.quantity * item.rate)}</span>
                                 </div>
-                                <div className="col-span-1 flex justify-end w-full">
+                                <div className="sm:col-span-1 col-span-1 flex justify-end w-full">
                                     <button
                                         type="button"
                                         className="p-1 text-danger-700 hover:text-danger-400 cursor-pointer rounded-full hover:bg-neutral-100"
                                         onClick={() => removeItem(item.id)}
                                         disabled={invoice.items.length === 1}
-                                        title={invoice.items.length === 1 ? "At least one item required" : "Delete item"}
+                                        title={invoice.items.length === 1 ? 'At least one item required' : 'Delete item'}
                                     >
                                         <Trash2 size={18} />
                                     </button>
@@ -466,29 +466,64 @@ const CreateInvoice: React.FC = () => {
                         </div>
                     </div>
                     <div className="bg-neutral-50 p-4 rounded-lg">
-                        <div className="flex justify-between py-2">
+                        <div className="flex justify-between py-2 border-b mb-3 border-red-600">
                             <span>Subtotal:</span>
                             <span>{formatRupees(subtotal)}</span>
                         </div>
-                        <div className="flex justify-between items-center py-2">
-                            <div className="flex items-center gap-2">
-                                <span>Tax:</span>
-                                <div className="w-16">
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="100"
-                                        className="form-input py-1 px-2 text-center"
-                                        value={invoice.tax ?? 0}
-                                        onChange={e => handleField('tax', Number(e.target.value))}
-                                    />
+                        <span className="text-gray-600 ml-2 text-sm">GST TAX:</span>
+                        <div className="bg-neutral-200 p-4 rounded-xl">
+                            <div className="flex justify-between items-center py-1">
+                                <div className="flex items-center text-sm gap-2">
+                                    <span>S GST</span>
+                                    <div className="w-16">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            className="form-input py-1 px-2 text-center"
+                                            value={invoice.sGST}
+                                            onChange={e => handleField('sGST', Number(e.target.value))}
+                                        />
+                                    </div>
+                                    <span>%</span>
                                 </div>
-                                <span>%</span>
+                                <span>{formatRupees(sgstAmount)}</span>
                             </div>
-                            <span>{formatRupees(taxAmount)}</span>
+                            <div className="flex justify-between items-center py-1">
+                                <div className="flex items-center text-sm gap-2">
+                                    <span>C GST</span>
+                                    <div className="w-16">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            className="form-input py-1 px-2 text-center"
+                                            value={cGST}
+                                            readOnly
+                                        />
+                                    </div>
+                                    <span>%</span>
+                                </div>
+                                <span>{formatRupees(cgstAmount)}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 mt-3 border-gray-500 border-t">
+                                <div className="flex items-center text-sm gap-2">
+                                    <span>Tax:</span>
+                                    <div className="w-16">
+                                        <input
+                                            type="number"
+                                            className="form-input py-1 px-2 text-center"
+                                            value={invoice.sGST + cGST}
+                                            readOnly
+                                        />
+                                    </div>
+                                    <span>%</span>
+                                </div>
+                                <span>{formatRupees(taxAmount)}</span>
+                            </div>
                         </div>
-                        <div className="flex justify-between items-center py-2 border-b border-neutral-200">
-                            <div className="flex items-center gap-2">
+                        <div className="flex justify-between items-center py-2 border-b border-red-600">
+                            <div className="flex items-center text-sm gap-2">
                                 <span>Discount:</span>
                                 <div className="w-16">
                                     <input
@@ -496,20 +531,38 @@ const CreateInvoice: React.FC = () => {
                                         min="0"
                                         max="100"
                                         className="form-input py-1 px-2 text-center"
-                                        value={invoice.discount ?? 0}
+                                        value={invoice.discount}
                                         onChange={e => handleField('discount', Number(e.target.value))}
                                     />
                                 </div>
                                 <span>%</span>
                             </div>
-                            <span>-{formatRupees(discountAmount)}</span>
+                            <span className="text-red-600">-{formatRupees(discountAmount)}</span>
                         </div>
-                        <div className="flex justify-between py-3 font-medium text-lg">
+                        {errors.discount && <div className="text-red-600 text-sm mt-1">{errors.discount}</div>}
+                        {errors.sGST && <div className="text-red-600 text-sm mt-1">{errors.sGST}</div>}
+                        <div className="flex justify-between py-3 font-medium text-sm">
                             <span>Grand Total:</span>
                             <span>{formatRupees(grandTotal)}</span>
                         </div>
+                        <div className="flex justify-between py-3 font-medium text-sm">
+                            <span>Paid:</span>
+                            <input
+                                type="number"
+                                min="0"
+                                className="form-input py-1 px-2 text-center w-24"
+                                value={invoice.paidAmount}
+                                onChange={e => handleField('paidAmount', Number(e.target.value))}
+                            />
+                        </div>
+                        {errors.paidAmount && <div className="text-red-600 text-sm mt-1">{errors.paidAmount}</div>}
+                        <div className="flex justify-between py-3 font-medium text-green-600 text-sm">
+                            <span>Balance Due:</span>
+                            <span>{formatRupees(balanceDue)}</span>
+                        </div>
                     </div>
                 </div>
+                {errors.submit && <div className="text-red-600 text-sm mt-2">{errors.submit}</div>}
             </form>
         </div>
     );

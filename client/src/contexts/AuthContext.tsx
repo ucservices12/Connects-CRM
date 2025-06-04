@@ -1,21 +1,10 @@
-import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { User, LoginCredentials, RegisterData } from '../types/auth';
 import { getCurrentUser, loginUser, logoutUser, registerUser } from '../machine/auth';
+import { getOrganization } from '../machine/organization';
 
-interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (credentials: LoginCredentials) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
-  forgotPassword: (email: string) => Promise<void>;
-  checkAuth: () => void;
-}
-
-const AuthContext = createContext<AuthContextType>({
+const AuthContext = createContext({
   user: null,
   isAuthenticated: false,
   isLoading: true,
@@ -28,11 +17,26 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [organization, setOrganization] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const getOrganizationData = async () => {
+      if (user?.organization) {
+        try {
+          const response = await getOrganization(user.organization);
+          setOrganization(response);
+        } catch (error) {
+          console.log(error);
+        }
+      }
+    };
+    getOrganizationData();
+  }, [user]);
 
   const checkAuth = useCallback(() => {
     const run = async () => {
@@ -49,7 +53,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(false);
       }
     };
-
     run();
   }, [navigate]);
 
@@ -57,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkAuth();
   }, [checkAuth]);
 
-  const login = async (credentials: LoginCredentials) => {
+  const login = async (credentials) => {
     setIsLoading(true);
     try {
       const userData = await loginUser(credentials, navigate);
@@ -74,20 +77,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       else if (role === 'manager') path = '/dashboard/manager';
       else if (role === 'employee') path = '/dashboard/employee';
       navigate(path);
-    } catch (error: any) {
+    } catch (error) {
       console.error(error.response?.data?.error || error.message || "Login failed");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const register = async (data: RegisterData) => {
+  const register = async (data) => {
     setIsLoading(true);
     try {
       await registerUser(data);
       toast.success("Registration successful! Please log in.");
       navigate("/login");
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error.response?.data?.error || error.message || "Registration failed");
     } finally {
       setIsLoading(false);
@@ -95,24 +98,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    logoutUser()
+    logoutUser();
     setUser(null);
     setIsAuthenticated(false);
     toast.success('Logged out successfully');
     navigate('/login');
-  };
-
-  const forgotPassword = async (email: string) => {
-    setIsLoading(true);
-    try {
-      // Replace with your actual API if needed
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      toast.success('Password reset link has been sent to your email');
-    } catch (error: any) {
-      toast.error(error.message || 'Something went wrong');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (
@@ -124,8 +114,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         register,
         logout,
-        forgotPassword,
         checkAuth,
+        organization
       }}
     >
       {children}

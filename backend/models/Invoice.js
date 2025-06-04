@@ -1,12 +1,24 @@
 const mongoose = require('mongoose');
 
 const InvoiceSchema = new mongoose.Schema({
-    organizationId: {
+    orgId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Organization',
-        required: true
+        required: true,
+        validate: {
+            validator: v => mongoose.Types.ObjectId.isValid(v),
+            message: 'Invalid organizationId'
+        }
     },
     client: {
+        id: {
+            type: String,
+            required: true
+        },
+        companyName: {
+            type: String,
+            required: [true, 'Please add a company name']
+        },
         name: {
             type: String,
             required: [true, 'Please add a client name']
@@ -20,7 +32,7 @@ const InvoiceSchema = new mongoose.Schema({
             ]
         },
         phone: {
-            type: String,
+            type: Number,
             default: ''
         },
         address: {
@@ -63,6 +75,14 @@ const InvoiceSchema = new mongoose.Schema({
         type: Number,
         required: [true, 'Please add a total amount']
     },
+    sGST: {
+        type: Number,
+        default: 0
+    },
+    cGST: {
+        type: Number,
+        default: 0
+    },
     tax: {
         type: Number,
         default: 0
@@ -95,10 +115,18 @@ const InvoiceSchema = new mongoose.Schema({
     paidAt: {
         type: Date
     },
+    paidAmount: {
+        type: Number,
+        default: 0
+    },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true
+        required: true,
+        validate: {
+            validator: v => mongoose.Types.ObjectId.isValid(v),
+            message: 'Invalid createdBy'
+        }
     },
     createdAt: {
         type: Date,

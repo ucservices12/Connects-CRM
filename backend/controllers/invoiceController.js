@@ -5,85 +5,35 @@ const sendEmail = require('../utils/sendEmail');
 const EmailTemplate = require('../models/EmailTemplate');
 
 // @desc    Get all invoices
-// @route   GET /api/invoices
+// @route   GET /api/v1/invoices
 // @access  Private
 exports.getInvoices = async (req, res, next) => {
     try {
-        // Build query
-        let query;
+        const { orgId, page = 1, limit = 10 } = req.query;
 
-        // Copy req.query
-        const reqQuery = { ...req.query };
-
-        // Fields to exclude
-        const removeFields = ['select', 'sort', 'page', 'limit'];
-
-        // Remove fields from reqQuery
-        removeFields.forEach(param => delete reqQuery[param]);
-
-        // Create query string
-        let queryStr = JSON.stringify(reqQuery);
-
-        // Create operators ($gt, $gte, etc)
-        queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
-
-        // Finding resource with organization scope
-        query = Invoice.find({
-            ...JSON.parse(queryStr),
-            organizationId: req.organizationId
-        });
-
-        // Select fields
-        if (req.query.select) {
-            const fields = req.query.select.split(',').join(' ');
-            query = query.select(fields);
+        // Defensive check
+        if (!orgId) {
+            return res.status(400).json({ success: false, message: "Organization ID required" });
         }
 
-        // Sort
-        if (req.query.sort) {
-            const sortBy = req.query.sort.split(',').join(' ');
-            query = query.sort(sortBy);
-        } else {
-            query = query.sort('-createdAt');
-        }
+        const pageNum = Number(page) || 1;
+        const limitNum = Number(limit) || 10;
 
-        // Pagination
-        const page = parseInt(req.query.page, 10) || 1;
-        const limit = parseInt(req.query.limit, 10) || 10;
-        const startIndex = (page - 1) * limit;
-        const endIndex = page * limit;
-        const total = await Invoice.countDocuments({
-            ...JSON.parse(queryStr),
-            organizationId: req.organizationId
-        });
+        const filter = { orgId };
 
-        query = query.skip(startIndex).limit(limit);
+        const invoices = await Invoice.find(filter)
+            .skip((pageNum - 1) * limitNum)
+            .limit(limitNum)
+            .sort({ createdAt: -1 });
 
-        // Executing query
-        const invoices = await query;
-
-        // Pagination result
-        const pagination = {};
-
-        if (endIndex < total) {
-            pagination.next = {
-                page: page + 1,
-                limit
-            };
-        }
-
-        if (startIndex > 0) {
-            pagination.prev = {
-                page: page - 1,
-                limit
-            };
-        }
+        const total = await Invoice.countDocuments(filter);
 
         res.status(200).json({
             success: true,
-            count: invoices.length,
-            pagination,
-            data: invoices
+            data: invoices,
+            totalPages: Math.ceil(total / limitNum),
+            page: pageNum,
+            total
         });
     } catch (err) {
         next(err);
@@ -91,7 +41,7 @@ exports.getInvoices = async (req, res, next) => {
 };
 
 // @desc    Get single invoice
-// @route   GET /api/invoices/:id
+// @route   GET /api/v1/invoices/:id
 // @access  Private
 exports.getInvoice = async (req, res, next) => {
     try {
@@ -105,17 +55,10 @@ exports.getInvoice = async (req, res, next) => {
         }
 
         // Defensive check for organizationId
-        if (!invoice.organizationId || !req.organizationId) {
+        if (!invoice.orgId) {
             return res.status(400).json({
                 success: false,
                 message: `Organization ID missing`
-            });
-        }
-
-        if (invoice.organizationId.toString() !== req.organizationId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: `Not authorized to access this invoice`
             });
         }
 
@@ -129,9 +72,10 @@ exports.getInvoice = async (req, res, next) => {
 };
 
 // @desc    Create new invoice
-// @route   POST /api/invoices
+// @route   POST /api/v1/invoices
 // @access  Private/Admin
 exports.createInvoice = async (req, res, next) => {
+    const invoiceData = req.body
     try {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -139,45 +83,35 @@ exports.createInvoice = async (req, res, next) => {
         }
 
         // Defensive: check for user and org
-        if (!req.user || !req.user.id) {
+        if (!invoiceData.createdBy) {
             return res.status(400).json({ error: 'User ID is required' });
         }
-        if (!invoice.organizationId || !req.organizationId) {
+        if (!invoiceData.orgId) {
             return res.status(400).json({
                 success: false,
                 message: 'Organization ID missing'
             });
         }
-        if (invoice.organizationId.toString() !== req.organizationId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'Not authorized to access this invoice'
-            });
-        }
-
-        // Add user id to request body
-        req.body.createdBy = req.user.id;
-        req.body.organizationId = req.organizationId;
 
         // Calculate totals and validate
-        if (req.body.items && req.body.items.length > 0) {
+        if (invoiceData.items && invoiceData.items.length > 0) {
             let totalAmount = 0;
 
             // Calculate amount for each item and total
-            req.body.items.forEach(item => {
+            invoiceData.items.forEach(item => {
                 item.amount = item.quantity * item.rate;
                 totalAmount += item.amount;
             });
 
-            req.body.totalAmount = totalAmount;
+            invoiceData.totalAmount = totalAmount;
 
             // Calculate grand total with tax
-            const taxAmount = totalAmount * (req.body.tax / 100 || 0);
-            const discountAmount = totalAmount * (req.body.discount / 100 || 0);
-            req.body.grandTotal = totalAmount + taxAmount - discountAmount;
+            const taxAmount = totalAmount * (invoiceData.tax / 100 || 0);
+            const discountAmount = totalAmount * (invoiceData.discount / 100 || 0);
+            invoiceData.grandTotal = totalAmount + taxAmount - discountAmount;
         }
 
-        const invoice = await Invoice.create(req.body);
+        const invoice = await Invoice.create(invoiceData);
 
         res.status(201).json({
             success: true,
@@ -189,7 +123,7 @@ exports.createInvoice = async (req, res, next) => {
 };
 
 // @desc    Update invoice
-// @route   PUT /api/invoices/:id
+// @route   PUT /api/v1/invoices/:id
 // @access  Private/Admin
 exports.updateInvoice = async (req, res, next) => {
     try {
@@ -203,17 +137,10 @@ exports.updateInvoice = async (req, res, next) => {
         }
 
         // Defensive check for organizationId
-        if (!invoice.organizationId || !req.organizationId) {
+        if (!invoice.orgId) {
             return res.status(400).json({
                 success: false,
                 message: `Organization ID missing`
-            });
-        }
-
-        if (invoice.organizationId.toString() !== req.organizationId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: `Not authorized to update this invoice`
             });
         }
 
@@ -226,27 +153,29 @@ exports.updateInvoice = async (req, res, next) => {
         }
 
         // Recalculate totals if items are updated
-        if (req.body.items && req.body.items.length > 0) {
+        if (invoice.items && invoice.items.length > 0) {
             let totalAmount = 0;
 
             // Calculate amount for each item and total
-            req.body.items.forEach(item => {
+            invoice.items.forEach(item => {
                 item.amount = item.quantity * item.rate;
                 totalAmount += item.amount;
             });
 
-            req.body.totalAmount = totalAmount;
+            invoice.totalAmount = totalAmount;
 
             // Calculate grand total with tax
-            const taxAmount = totalAmount * (req.body.tax / 100 || 0);
-            const discountAmount = totalAmount * (req.body.discount / 100 || 0);
-            req.body.grandTotal = totalAmount + taxAmount - discountAmount;
+            const taxAmount = totalAmount * (invoice.tax / 100 || 0);
+            const discountAmount = totalAmount * (invoice.discount / 100 || 0);
+            invoice.grandTotal = totalAmount + taxAmount - discountAmount;
         }
 
-        invoice = await Invoice.findByIdAndUpdate(req.params.id, req.body, {
+        invoice = await Invoice.findByIdAndUpdate(req.params.id, invoice, {
             new: true,
             runValidators: true
         });
+
+        console.log("invoice ::", invoice);
 
         res.status(200).json({
             success: true,
@@ -258,7 +187,7 @@ exports.updateInvoice = async (req, res, next) => {
 };
 
 // @desc    Delete invoice
-// @route   DELETE /api/invoices/:id
+// @route   DELETE /api/v1/invoices/:id
 // @access  Private/Admin
 exports.deleteInvoice = async (req, res, next) => {
     try {
@@ -272,17 +201,10 @@ exports.deleteInvoice = async (req, res, next) => {
         }
 
         // Defensive check for organizationId
-        if (!invoice.organizationId || !req.organizationId) {
+        if (!invoice.orgId) {
             return res.status(400).json({
                 success: false,
                 message: `Organization ID missing`
-            });
-        }
-
-        if (invoice.organizationId.toString() !== req.organizationId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: `Not authorized to delete this invoice`
             });
         }
 
@@ -294,7 +216,7 @@ exports.deleteInvoice = async (req, res, next) => {
             });
         }
 
-        await invoice.remove();
+        await Invoice.deleteOne({ _id: invoice._id });
 
         res.status(200).json({
             success: true,
@@ -304,6 +226,7 @@ exports.deleteInvoice = async (req, res, next) => {
         next(err);
     }
 };
+
 
 // @desc    Generate invoice PDF
 // @route   GET /api/invoices/:id/pdf

@@ -3,7 +3,7 @@ import { Search } from 'lucide-react';
 
 type Client = {
     id: string;
-    company: string;
+    companyName: string;
     name: string;
     address: string;
     email: string;
@@ -25,7 +25,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
 
     const filteredClients = clients.filter(client =>
         client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client.company.toLowerCase().includes(searchTerm.toLowerCase())
+        client.companyName.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const selectedClientData = clients.find(client => client.id === selectedClient);
@@ -33,6 +33,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
     const handleSelect = (clientId: string) => {
         onChange(clientId);
         setIsOpen(false);
+        console.log("invoiceSelectedClient=>", selectedClient);
     };
 
     return (
@@ -43,7 +44,7 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
             >
                 {selectedClientData ? (
                     <div>
-                        <div className="font-medium">{selectedClientData.company}</div>
+                        <div className="font-medium">{selectedClientData.companyName}</div>
                         <div className="text-sm text-neutral-500">{selectedClientData.name}</div>
                     </div>
                 ) : (
@@ -83,13 +84,13 @@ const ClientSelector: React.FC<ClientSelectorProps> = ({
 
                     <div className="max-h-60 overflow-y-auto">
                         {filteredClients.length > 0 ? (
-                            filteredClients.map(client => (
+                            filteredClients.map((client, index) => (
                                 <div
-                                    key={client.id}
+                                    key={index}
                                     className={`p-3 hover:bg-neutral-50 cursor-pointer ${selectedClient === client.id ? 'bg-primary-50' : ''}`}
                                     onClick={() => handleSelect(client.id)}
                                 >
-                                    <div className="font-medium">{client.company}</div>
+                                    <div className="font-medium">{client.companyName}</div>
                                     <div className="text-sm text-neutral-500 flex justify-between">
                                         <span>{client.name}</span>
                                         <span>{client.email}</span>
