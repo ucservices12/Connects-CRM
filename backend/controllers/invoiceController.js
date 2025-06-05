@@ -1,4 +1,5 @@
 const Invoice = require('../models/Invoice');
+const InvoiceSetting = require('../models/InvoiceSetting');
 const { validationResult } = require('express-validator');
 const generatePDF = require('../utils/generatePDF');
 const sendEmail = require('../utils/sendEmail');
@@ -136,7 +137,6 @@ exports.updateInvoice = async (req, res, next) => {
             });
         }
 
-        // Defensive check for organizationId
         if (!invoice.orgId) {
             return res.status(400).json({
                 success: false,
@@ -144,43 +144,49 @@ exports.updateInvoice = async (req, res, next) => {
             });
         }
 
-        // Don't allow updating paid invoices
-        if (invoice.status === 'Paid') {
+        // If the invoice is paid and already edited once, block further updates
+        if (invoice.status === 'Paid' && invoice.wasPaidInvoiceEdited) {
             return res.status(400).json({
                 success: false,
-                message: `Cannot update a paid invoice`
+                message: `Cannot update a paid invoice more than once`
             });
         }
 
         // Recalculate totals if items are updated
-        if (invoice.items && invoice.items.length > 0) {
+        if (req.body.items && req.body.items.length > 0) {
             let totalAmount = 0;
 
-            // Calculate amount for each item and total
-            invoice.items.forEach(item => {
+            req.body.items.forEach(item => {
                 item.amount = item.quantity * item.rate;
                 totalAmount += item.amount;
             });
 
-            invoice.totalAmount = totalAmount;
+            req.body.totalAmount = totalAmount;
 
-            // Calculate grand total with tax
-            const taxAmount = totalAmount * (invoice.tax / 100 || 0);
-            const discountAmount = totalAmount * (invoice.discount / 100 || 0);
-            invoice.grandTotal = totalAmount + taxAmount - discountAmount;
+            const tax = req.body.tax || 0;
+            const discount = req.body.discount || 0;
+
+            const taxAmount = totalAmount * (tax / 100);
+            const discountAmount = totalAmount * (discount / 100);
+            req.body.grandTotal = totalAmount + taxAmount - discountAmount;
         }
 
-        invoice = await Invoice.findByIdAndUpdate(req.params.id, invoice, {
+        // If invoice is Paid and hasn't been edited yet, mark it as edited
+        if (invoice.status === 'Paid' && !invoice.wasPaidInvoiceEdited) {
+            req.body.wasPaidInvoiceEdited = true;
+        }
+
+        // Perform update
+        invoice = await Invoice.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true
         });
-
-        console.log("invoice ::", invoice);
 
         res.status(200).json({
             success: true,
             data: invoice
         });
+
     } catch (err) {
         next(err);
     }
@@ -227,9 +233,8 @@ exports.deleteInvoice = async (req, res, next) => {
     }
 };
 
-
 // @desc    Generate invoice PDF
-// @route   GET /api/invoices/:id/pdf
+// @route   GET /api/v1/invoices/:id/pdf
 // @access  Private
 exports.generateInvoicePDF = async (req, res, next) => {
     try {
@@ -271,8 +276,60 @@ exports.generateInvoicePDF = async (req, res, next) => {
     }
 };
 
+// @desc    Create settings
+// @route   POST /api/v1/invoices/setting
+// @access  Private/Admin
+exports.createSettings = async (req, res) => {
+    try {
+        const { orgId, settings } = req.body;
+
+        if (!orgId) {
+            return res.status(400).json({ message: 'Organization ID required' });
+        }
+
+        const existingSettings = await InvoiceSetting.findOne({ orgId });
+
+        if (existingSettings) {
+            // Update existing settings
+            const updated = await InvoiceSetting.findOneAndUpdate(
+                { orgId },
+                { $set: { settings } },
+                { new: true }
+            );
+
+            return res.status(200).json({ message: 'Settings updated successfully', data: updated });
+        }
+
+        // Create new settings
+        const newSettings = new InvoiceSetting({ orgId, settings });
+        await newSettings.save();
+
+        res.status(201).json({ message: 'Settings created successfully', data: newSettings });
+    } catch (err) {
+        console.error("createSettings error:", err);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// @desc    Get settings
+// @route   GET /api/v1/invoices/setting
+// @access  Private/Admin
+exports.getSettings = async (req, res) => {
+    try {
+        const orgId = req.query.orgId;
+        if (!orgId) return res.status(400).json({ message: 'Organization ID required' });
+
+        const settings = await InvoiceSetting.findOne({ orgId });
+        if (!settings) return res.status(404).json({ message: 'Settings not found' });
+
+        res.json(settings);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
 // @desc    Send invoice email
-// @route   POST /api/invoices/:id/send
+// @route   POST /api/v1/invoices/:id/send
 // @access  Private/Admin
 exports.sendInvoiceEmail = async (req, res, next) => {
     try {
@@ -285,7 +342,6 @@ exports.sendInvoiceEmail = async (req, res, next) => {
             });
         }
 
-        // Defensive check for organizationId
         if (!invoice.organizationId || !req.organizationId) {
             return res.status(400).json({
                 success: false,

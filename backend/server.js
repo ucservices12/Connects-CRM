@@ -22,6 +22,7 @@ const leaveRoutes = require('./routes/leaveRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const assetRoutes = require('./routes/assetRoutes');
 const invoiceRoutes = require('./routes/invoiceRoutes');
+const invoiceSettingRoutes = require('./routes/invoiceSettingRoutes');
 const emailTemplateRoutes = require('./routes/emailTemplateRoutes');
 
 const app = express();
@@ -49,6 +50,7 @@ app.use('/api/v1/attendance', attendanceRoutes);
 app.use('/api/v1/assets', assetRoutes);
 app.use('/api/v1/email-templates', emailTemplateRoutes);
 app.use('/api/v1/invoices', invoiceRoutes);
+app.use('/api/v1/invoiceSettings', invoiceSettingRoutes);
 
 // Simple route for testing
 app.get('/', (req, res) => {

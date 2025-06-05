@@ -125,6 +125,11 @@ A comprehensive backend system for company management using Node.js, Express.js,
 - GET    /api/v1/invoices/:id/download - Download PDF
 - GET    /api/v1/invoices/:id/public   - Get public link
 
+### Invoice Settings
+- GET    /api/v1/invoices/setting           - Get invoice settings (for current org/user)
+- PUT    /api/v1/invoices/setting           - Update invoice settings
+- POST   /api/v1/invoices/setting    - Reset invoice settings to defaults
+
 ## Role-based Access Control
 
 - **Admin**: Full access to all resources and operations

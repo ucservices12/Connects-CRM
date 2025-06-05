@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API = "http://localhost:5000/api/v1/invoices";
+const SETTING_API = "http://localhost:5000/api/v1/invoiceSettings";
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -121,6 +122,50 @@ export const sendInvoiceEmail = async (id: string, emailData: any) => {
         return response.data;
     } catch (error) {
         console.error("Error sending invoice email:", error);
+        throw error;
+    }
+};
+
+export const getInvoiceSetting = async (orgId: string) => {
+    try {
+        const response = await axios.get(`${SETTING_API}?orgId=${orgId}`, {
+            headers: getAuthHeaders()
+        });
+        console.log("getInvoiceSetting =>", response.data)
+
+        return response.data.settings;
+    } catch (error) {
+        console.error("Error fetching invoice settings:", error);
+        throw error;
+    }
+};
+
+export const createInvoiceSetting = async (data: any) => {
+    try {
+        const response = await axios.post(SETTING_API, data, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            }
+        });
+        return response.data.data;
+    } catch (error) {
+        console.error("Error creating invoice settings:", error);
+        throw error;
+    }
+};
+
+export const updateInvoiceSetting = async (id: string, data: any) => {
+    try {
+        const response = await axios.put(`${SETTING_API}/${id}`, data, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            }
+        });
+        return response.data.data;
+    } catch (error) {
+        console.error("Error updating invoice settings:", error);
         throw error;
     }
 };

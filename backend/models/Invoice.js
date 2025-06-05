@@ -7,11 +7,12 @@ const InvoiceSchema = new mongoose.Schema({
         required: true,
         validate: {
             validator: v => mongoose.Types.ObjectId.isValid(v),
-            message: 'Invalid organizationId'
+            message: 'Invalid organizationId',
         }
     },
+
     client: {
-        id: {
+        clientId: {
             type: String,
             required: true
         },
@@ -32,23 +33,25 @@ const InvoiceSchema = new mongoose.Schema({
             ]
         },
         phone: {
-            type: Number,
+            type: String,
             default: ''
         },
         address: {
-            street: String,
-            city: String,
-            state: String,
-            zipCode: String,
-            country: String
+            street: { type: String, default: '' },
+            city: { type: String, default: '' },
+            state: { type: String, default: '' },
+            zipCode: { type: String, default: '' },
+            country: { type: String, default: '' }
         }
     },
+
     invoiceNo: {
         type: String,
         required: [true, 'Please add an invoice number'],
         unique: true,
         trim: true
     },
+
     items: [
         {
             description: {
@@ -71,6 +74,7 @@ const InvoiceSchema = new mongoose.Schema({
             }
         }
     ],
+
     totalAmount: {
         type: Number,
         required: [true, 'Please add a total amount']
@@ -95,30 +99,40 @@ const InvoiceSchema = new mongoose.Schema({
         type: Number,
         required: [true, 'Please add a grand total']
     },
+
     status: {
         type: String,
         enum: ['Draft', 'Sent', 'Paid', 'Overdue', 'Cancelled'],
         default: 'Draft'
     },
+
     dueDate: {
         type: Date
     },
+
     notes: {
-        type: String
+        type: String,
+        default: ''
     },
+
     terms: {
-        type: String
+        type: String,
+        default: ''
     },
+
     sentAt: {
         type: Date
     },
+
     paidAt: {
         type: Date
     },
+
     paidAmount: {
         type: Number,
         default: 0
     },
+
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -128,17 +142,53 @@ const InvoiceSchema = new mongoose.Schema({
             message: 'Invalid createdBy'
         }
     },
+
+    settings: {
+        company: {
+            name: { type: String, default: '' },
+            address: { type: String, default: '' },
+            city: { type: String, default: '' },
+            state: { type: String, default: '' },
+            zip: { type: String, default: '' },
+            phone: { type: String, default: '' },
+            email: { type: String, default: '' },
+            website: { type: String, default: '' },
+            logoUrl: { type: String, default: '' },
+            gst: { type: String, default: '' },
+            tan: { type: String, default: '' }
+        },
+        invoice: {
+            prefix: { type: String, default: '' },
+            nextNumber: { type: String, default: '' },
+            terms: { type: String, default: '' },
+            notes: { type: String, default: '' },
+            defaultTax: { type: Number, default: 0 }
+        },
+        payment: {
+            bankName: { type: String, default: '' },
+            accountName: { type: String, default: '' },
+            accountNumber: { type: String, default: '' },
+            routingNumber: { type: String, default: '' },
+            paypal: { type: String, default: '' }
+        }
+    },
+
     createdAt: {
         type: Date,
         default: Date.now
     },
+
     updatedAt: {
         type: Date,
         default: Date.now
+    },
+
+    wasPaidInvoiceEdited: {
+        type: Boolean,
+        default: false
     }
 });
 
-// Update the updatedAt field before saving
 InvoiceSchema.pre('save', function (next) {
     this.updatedAt = Date.now();
     next();

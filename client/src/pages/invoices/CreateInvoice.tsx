@@ -6,6 +6,7 @@ import ClientSelector from '../../components/invoices/ClientSelector';
 import { createInvoice } from '../../machine/invoice';
 import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../components/common/Toaster';
+import { TextareaAutosize } from '@mui/material';
 
 // Helpers
 const defaultAddress = { street: '', city: '', state: '', zipCode: '', country: '' };
@@ -16,25 +17,6 @@ const defaultItem = () => ({
     rate: 0,
 });
 
-const initialClients = [
-    {
-        id: '1',
-        company: 'Acme Corp',
-        name: 'Rahul Sharma',
-        address: { street: '123 Main St', city: 'Mumbai', state: 'Maharashtra', zipCode: '400001', country: 'India' },
-        email: 'acme@example.com',
-        phone: '9999999999',
-    },
-    {
-        id: '2',
-        company: 'Wipro Technology',
-        name: 'Rohan kumar',
-        address: { street: '164 tech park', city: 'pune', state: 'Maharashtra', zipCode: '400001', country: 'India' },
-        email: 'tech@gmail.com',
-        phone: '9568956565',
-    },
-];
-
 const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
 
 const CreateInvoice = () => {
@@ -42,9 +24,9 @@ const CreateInvoice = () => {
     const { organization, user } = useAuth();
 
     // State
-    const [clients, setClients] = useState(initialClients);
+    const [clients, setClients] = useState([]);
     const [showAddClient, setShowAddClient] = useState(false);
-    const [newClient, setNewClient] = useState({ company: '', name: '', address: { ...defaultAddress }, email: '', phone: '' });
+    const [newClient, setNewClient] = useState({ companyName: '', name: '', address: { ...defaultAddress }, email: '', phone: '' });
     const [invoice, setInvoice] = useState({
         clientId: '',
         invoiceNo: `INV-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
@@ -91,10 +73,10 @@ const CreateInvoice = () => {
             items: inv.items.length > 1 ? inv.items.filter(item => item.id !== id) : inv.items,
         }));
 
-    // Add new client
+    // Add new client (with unique id)
     const handleAddClient = () => {
         let error = '';
-        if (!newClient.company.trim()) error = 'Company is required.';
+        if (!newClient.companyName.trim()) error = 'Company is required.';
         else if (!newClient.name.trim()) error = 'Client name is required.';
         else if (!newClient.email.trim()) error = 'Client email is required.';
         else if (!emailRegex.test(newClient.email)) error = 'Please enter a valid email address.';
@@ -119,7 +101,7 @@ const CreateInvoice = () => {
         if (!selectedClient) {
             newErrors.clientId = 'Please select a client.';
         } else {
-            if (!selectedClient.company || !selectedClient.company.trim()) {
+            if (!selectedClient.companyName || !selectedClient.companyName.trim()) {
                 newErrors.clientCompany = 'Client company name is required.';
             }
             if (!selectedClient.name || !selectedClient.name.trim()) {
@@ -174,7 +156,8 @@ const CreateInvoice = () => {
         const invoiceData = {
             orgId: organization._id,
             client: {
-                companyName: selectedClient.company,
+                clientId: selectedClient.id,
+                companyName: selectedClient.companyName,
                 name: selectedClient.name,
                 email: selectedClient.email,
                 phone: selectedClient.phone || '',
@@ -260,15 +243,15 @@ const CreateInvoice = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <input
                                         type="text"
-                                        className="form-input w-full"
+                                        className="form-input w-full capitalize"
                                         placeholder="Company Name"
-                                        value={newClient.company}
-                                        onChange={e => setNewClient(nc => ({ ...nc, company: e.target.value }))}
+                                        value={newClient.companyName}
+                                        onChange={e => setNewClient(nc => ({ ...nc, companyName: e.target.value }))}
                                         required
                                     />
                                     <input
                                         type="text"
-                                        className="form-input w-full"
+                                        className="form-input w-full capitalize"
                                         placeholder="Client Name"
                                         value={newClient.name}
                                         onChange={e => setNewClient(nc => ({ ...nc, name: e.target.value }))}
@@ -284,7 +267,7 @@ const CreateInvoice = () => {
                                     />
                                     <input
                                         type="text"
-                                        className="form-input w-full"
+                                        className="form-input w-full capitalize"
                                         placeholder="Phone"
                                         value={newClient.phone}
                                         onChange={e => setNewClient(nc => ({ ...nc, phone: e.target.value }))}
@@ -294,7 +277,7 @@ const CreateInvoice = () => {
                                         <input
                                             key={field}
                                             type="text"
-                                            className="form-input"
+                                            className="form-input capitalize"
                                             placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
                                             value={newClient.address[field]}
                                             onChange={e =>
@@ -387,7 +370,7 @@ const CreateInvoice = () => {
                                 <div className="sm:col-span-4 col-span-5 w-full">
                                     <input
                                         type="text"
-                                        className="form-input w-full"
+                                        className="form-input w-full capitalize"
                                         placeholder="Item description"
                                         value={item.description}
                                         onChange={e => handleItem(item.id, 'description', e.target.value)}
@@ -448,21 +431,41 @@ const CreateInvoice = () => {
                     <div>
                         <div className="form-group">
                             <label className="form-label">Notes</label>
-                            <textarea
-                                className="form-input h-24"
+                            <TextareaAutosize
+                                aria-label="Notes"
                                 placeholder="Payment terms, notes to client, etc."
-                                value={invoice.notes}
+                                minRows={3}
+                                value={invoice?.notes}
                                 onChange={e => handleField('notes', e.target.value)}
-                            ></textarea>
+                                style={{
+                                    width: "100%",
+                                    borderRadius: 6,
+                                    padding: 6,
+                                    fontSize: 16,
+                                    boxSizing: "border-box",
+                                    resize: "vertical"
+                                }}
+                                className='form-input capitalize'
+                            />
                         </div>
                         <div className="form-group">
                             <label className="form-label">Terms</label>
-                            <textarea
-                                className="form-input h-16"
+                            <TextareaAutosize
+                                aria-label="Terms"
                                 placeholder="Terms & Conditions"
-                                value={invoice.terms}
+                                minRows={3}
+                                value={invoice?.terms}
                                 onChange={e => handleField('terms', e.target.value)}
-                            ></textarea>
+                                style={{
+                                    width: "100%",
+                                    borderRadius: 6,
+                                    padding: 6,
+                                    fontSize: 16,
+                                    boxSizing: "border-box",
+                                    resize: "vertical"
+                                }}
+                                className='form-input capitalize'
+                            />
                         </div>
                     </div>
                     <div className="bg-neutral-50 p-4 rounded-lg">

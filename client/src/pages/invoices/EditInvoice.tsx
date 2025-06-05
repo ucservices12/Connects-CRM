@@ -68,6 +68,7 @@ const EditInvoice = () => {
         status: 'Draft',
         terms: '',
         paidAmount: 0,
+        wasPaidInvoiceEdited: false,
     });
 
     // Error message state
@@ -82,7 +83,7 @@ const EditInvoice = () => {
 
                 setInvoice(prev => ({
                     ...prev,
-                    clientId: data?.client?._id || data?.clientId || '',
+                    clientId: data?.client?.clientId || '',
                     invoiceNo: data?.invoiceNo || '',
                     issueDate: data?.createdAt ? new Date(data?.createdAt) : new Date(),
                     dueDate: data?.dueDate ? new Date(data?.dueDate) : new Date(),
@@ -98,13 +99,14 @@ const EditInvoice = () => {
                     status: data?.status || 'Draft',
                     terms: data?.terms || '',
                     paidAmount: data?.paidAmount || 0,
+                    wasPaidInvoiceEdited: data?.wasPaidInvoiceEdited || false,
                 }));
 
                 console.log("data", data)
 
                 setClients(prev => {
                     // Add the client from invoice if not already present
-                    const clientId = data?.client?._id || data?.clientId;
+                    const clientId = data?.client?.clientId;
                     if (!clientId) return prev;
                     const exists = prev.some(c => c.id === clientId);
                     if (exists) return prev;
@@ -216,9 +218,14 @@ const EditInvoice = () => {
     };
 
     // Submit handler
-    const handleSubmit = async (e, isDraft = true) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setErrorMsg('');
+
+        if (invoice.status === 'Paid' && invoice.wasPaidInvoiceEdited) {
+            toast.error("This paid invoice cannot be edited again.");
+            return;
+        }
 
         const selectedClient = clients.find(c => c.id === invoice.clientId);
         if (!selectedClient) {
@@ -240,7 +247,9 @@ const EditInvoice = () => {
 
         const invoiceData = {
             orgId: organization?._id,
+            _id: id,
             client: {
+                clientId: selectedClient?.id,
                 companyName: selectedClient?.companyName,
                 name: selectedClient?.name,
                 email: selectedClient?.email,
@@ -260,7 +269,7 @@ const EditInvoice = () => {
             tax: invoice?.sGST + invoice?.cGST,
             discount: invoice?.discount,
             grandTotal,
-            status: isDraft ? 'Draft' : invoice?.status,
+            status: invoice?.status,
             dueDate: invoice?.dueDate,
             notes: invoice?.notes,
             terms: invoice?.terms,
@@ -271,14 +280,16 @@ const EditInvoice = () => {
         };
 
         try {
-            const response = await updateInvoice(id, invoiceData);
-            // toast.success("Invoice updated successfully!");
-            console.log("update profile =>", response?.data)
-            navigate('/invoices/list');
+            const response = await updateInvoice(invoice?.id, invoiceData);
+            if (response.success === true) {
+                toast.success("Invoice updated successfully!");
+                navigate('/invoices/list');
+            }
         } catch (error) {
-            setErrorMsg("Failed to update invoice.");
+            toast.error("Paid Invoice Can't Edit");
         }
     };
+
 
     return (
         <div className="sm:space-y-6 space-y-4">
@@ -300,9 +311,11 @@ const EditInvoice = () => {
             </div>
 
             {/* Error message */}
-            {errorMsg && (
-                <div className="mb-4 text-red-600 font-medium text-sm">{errorMsg}</div>
-            )}
+            {
+                errorMsg && (
+                    <span className='text-red-600'>{errorMsg}</span>
+                )
+            }
 
             <form onSubmit={e => handleSubmit(e, true)} className="card space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -331,7 +344,7 @@ const EditInvoice = () => {
                                     <div>
                                         <input
                                             type="text"
-                                            className="form-input w-full"
+                                            className="form-input w-full capitalize"
                                             placeholder="Company Name"
                                             value={newClient.companyName}
                                             onChange={e => setNewClient(nc => ({ ...nc, companyName: e.target.value }))}
@@ -341,7 +354,7 @@ const EditInvoice = () => {
                                     <div>
                                         <input
                                             type="text"
-                                            className="form-input w-full"
+                                            className="form-input w-full capitalize"
                                             placeholder="Client Name"
                                             value={newClient.name}
                                             onChange={e => setNewClient(nc => ({ ...nc, name: e.target.value }))}
@@ -361,7 +374,7 @@ const EditInvoice = () => {
                                     <div>
                                         <input
                                             type="text"
-                                            className="form-input w-full"
+                                            className="form-input w-full "
                                             placeholder="Phone"
                                             value={newClient.phone}
                                             onChange={e => setNewClient(nc => ({ ...nc, phone: e.target.value }))}
@@ -371,7 +384,7 @@ const EditInvoice = () => {
                                     <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-5 gap-2">
                                         <input
                                             type="text"
-                                            className="form-input"
+                                            className="form-input capitalize"
                                             placeholder="Street"
                                             value={newClient.address.street}
                                             onChange={e => setNewClient(nc => ({
@@ -381,7 +394,7 @@ const EditInvoice = () => {
                                         />
                                         <input
                                             type="text"
-                                            className="form-input"
+                                            className="form-input capitalize"
                                             placeholder="City"
                                             value={newClient.address.city}
                                             onChange={e => setNewClient(nc => ({
@@ -391,7 +404,7 @@ const EditInvoice = () => {
                                         />
                                         <input
                                             type="text"
-                                            className="form-input"
+                                            className="form-input capitalize"
                                             placeholder="State"
                                             value={newClient.address.state}
                                             onChange={e => setNewClient(nc => ({
@@ -411,7 +424,7 @@ const EditInvoice = () => {
                                         />
                                         <input
                                             type="text"
-                                            className="form-input"
+                                            className="form-input capitalize"
                                             placeholder="Country"
                                             value={newClient.address.country}
                                             onChange={e => setNewClient(nc => ({
@@ -510,7 +523,7 @@ const EditInvoice = () => {
                                 <div className="sm:col-span-4 col-span-5 w-full">
                                     <input
                                         type="text"
-                                        className="form-input w-full"
+                                        className="form-input w-full capitalize"
                                         placeholder="Item description"
                                         value={item.description}
                                         onChange={e => handleItem(item.id, 'description', e.target.value)}
@@ -585,7 +598,7 @@ const EditInvoice = () => {
                                     boxSizing: "border-box",
                                     resize: "vertical"
                                 }}
-                                className='form-input'
+                                className='form-input capitalize'
                             />
                         </div>
                         <div className="form-group">
@@ -604,7 +617,7 @@ const EditInvoice = () => {
                                     boxSizing: "border-box",
                                     resize: "vertical"
                                 }}
-                                className='form-input'
+                                className='form-input capitalize'
                             />
                         </div>
                     </div>

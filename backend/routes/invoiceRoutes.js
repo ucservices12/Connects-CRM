@@ -1,13 +1,13 @@
 const express = require('express');
 const { check } = require('express-validator');
-const { 
+const {
   getInvoices,
   getInvoice,
   createInvoice,
   updateInvoice,
   deleteInvoice,
   generateInvoicePDF,
-  sendInvoiceEmail
+  sendInvoiceEmail,
 } = require('../controllers/invoiceController');
 const { protect, authorize, ensureOrganizationAccess } = require('../middleware/auth');
 
@@ -17,6 +17,7 @@ const router = express.Router();
 router.use(protect);
 router.use(ensureOrganizationAccess);
 
+// Invoice routes
 router.route('/')
   .get(getInvoices)
   .post(

@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import {
     Search, Filter, PlusCircle, Download, Eye, Edit,
     Trash2, CheckCircle, AlertTriangle, Clock, FileText,
-    ChevronLeft, ChevronRight
+    ChevronLeft, ChevronRight,
+    X
 } from 'lucide-react';
 import LoadingScreen from '../../components/common/LoadingScreen';
 import { deleteInvoice, getInvoices } from '../../machine/invoice';
@@ -25,7 +26,7 @@ import { toast } from '../../components/common/Toaster';
 
 const getStatusBadge = (status: string) => {
     switch (status) {
-        case 'paid':
+        case 'Paid':
             return (
                 <Chip
                     icon={<CheckCircle size={16} color='#00c853' />}
@@ -42,7 +43,7 @@ const getStatusBadge = (status: string) => {
                     size="small"
                 />
             );
-        case 'sent':
+        case 'Sent':
             return (
                 <Chip
                     icon={<Clock size={16} color='#1565C0' />}
@@ -59,11 +60,28 @@ const getStatusBadge = (status: string) => {
                     size="small"
                 />
             );
-        case 'overdue':
+        case 'Overdue':
             return (
                 <Chip
                     icon={<AlertTriangle size={16} color='#f44336' />}
                     label="Overdue"
+                    sx={{
+                        backgroundColor: '#FFEBEE',
+                        color: '#f44336',
+                        paddingX: 1.5,
+                        paddingY: 0.5,
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                        borderRadius: '8px',
+                    }}
+                    size="small"
+                />
+            );
+        case 'Cancelled':
+            return (
+                <Chip
+                    icon={<X size={16} color='#f44336' />}
+                    label="Cancelled"
                     sx={{
                         backgroundColor: '#FFEBEE',
                         color: '#f44336',
@@ -205,6 +223,7 @@ const InvoiceList = () => {
                                 <MenuItem value="sent">Sent</MenuItem>
                                 <MenuItem value="paid">Paid</MenuItem>
                                 <MenuItem value="overdue">Overdue</MenuItem>
+                                <MenuItem value="Cancelled">Cancelled</MenuItem>
                             </Select>
                         </FormControl>
                         <Button
@@ -246,8 +265,8 @@ const InvoiceList = () => {
                                         </Link>
                                     </td>
                                     <td className="py-3 px-4">
-                                        <div className="font-medium">{invoice?.client?.companyName}</div>
-                                        <div className="text-sm text-neutral-500">{invoice?.client?.name}</div>
+                                        <div className="font-medium capitalize">{invoice?.client?.companyName}</div>
+                                        <div className="text-sm text-neutral-500 capitalize">{invoice?.client?.name}</div>
                                     </td>
                                     <td className="py-3 px-4">
                                         {new Date(invoice?.createdAt).toLocaleDateString('en-IN')}
@@ -264,7 +283,7 @@ const InvoiceList = () => {
                                     <td className="py-3 px-4">
                                         <div className="flex justify-center gap-2">
                                             <Link
-                                                to={`/invoices/${invoice?.invoiceNo}`}
+                                                to={`/invoices/${invoice?._id}`}
                                                 className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
                                                 title="View"
                                             >
@@ -327,7 +346,7 @@ const InvoiceList = () => {
                                 </span>
                                 <div className="flex gap-2">
                                     <Link
-                                        to={`/invoices/${invoice?.invoiceNo}`}
+                                        to={`/invoices/${invoice?._id}`}
                                         className="p-1 text-neutral-500 hover:text-primary-600 hover:bg-neutral-100 rounded"
                                         title="View"
                                     >
