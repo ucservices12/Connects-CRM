@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { getAuthHeader } from './auth';
 
-const EMPLOYEE_API = "http://localhost:5000/api/v1/employees";
+const SUB_API = import.meta.env.VITE_PRIVATE_API;
+const EMPLOYEE_API = `${SUB_API}/employees`;
 
 // Create Employee
 export const createEmployee = async (formData) => {

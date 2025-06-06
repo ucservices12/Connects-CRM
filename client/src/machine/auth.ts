@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API = "http://localhost:5000/api/v1/auth";
+const SUB_API = import.meta.env.VITE_PRIVATE_API;
+const API = `${SUB_API}/auth`;
 
 // Get token from localStorage
 export const getAuthHeader = () => {

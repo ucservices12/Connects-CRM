@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-const API = "http://localhost:5000/api/v1/invoices";
-const SETTING_API = "http://localhost:5000/api/v1/invoiceSettings";
+const SUB_API = import.meta.env.VITE_PRIVATE_API;
+
+const API = `${SUB_API}/invoices`;
+const SETTING_API = `${SUB_API}/invoiceSettings`;
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
