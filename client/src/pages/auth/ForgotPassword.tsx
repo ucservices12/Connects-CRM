@@ -1,13 +1,14 @@
 import { useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
 import ResetPassword from './ResetPassword';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../redux/store';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const { isLoading } = useAuth();
+  const { isLoading } = useSelector((state: RootState) => state.auth);
 
   const handleEmailSubmit = async (e: FormEvent) => {
     e.preventDefault();
