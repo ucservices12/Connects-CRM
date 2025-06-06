@@ -1,9 +1,17 @@
 import { useState, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from '../../redux/store';
+import { register } from '../../redux/slices/authSlice';
+import { toast } from '../../components/common/Toaster';
 
 const Register = () => {
+  const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
+
+  const { isLoading } = useSelector((state: RootState) => state.auth);
+
   const [formData, setFormData] = useState({
     firstName: '',
     email: '',
@@ -14,16 +22,12 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const navigate = useNavigate();
-
-  const { register, isLoading } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-
+    setFormData(prev => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors({ ...errors, [name]: '' });
+      setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
@@ -59,11 +63,14 @@ const Register = () => {
 
     if (validateForm()) {
       try {
-        await register(formData);
-        localStorage.setItem('CognitoIdentityServiceProvider', JSON.stringify(formData.email));
+        await dispatch(register({ data: formData, navigate, toast })).unwrap();
+        localStorage.setItem(
+          'CognitoIdentityServiceProvider',
+          JSON.stringify(formData.email)
+        );
         navigate('/verify-otp');
-      } catch (error) {
-        console.error('Registration failed:', error);
+      } catch (error: any) {
+        toast.error(error || 'Registration failed');
       }
     }
   };

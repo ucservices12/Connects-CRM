@@ -29,7 +29,7 @@ interface Invoice {
 const ClientInvoices = () => {
     const { clientId } = useParams<{ clientId: string }>();
     const navigate = useNavigate();
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [client, setClient] = useState<Client | null>(null);
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -166,21 +166,21 @@ const ClientInvoices = () => {
                         </div>
 
                         <div>
-                            <h2 className="text-xl font-medium">{client.company}</h2>
-                            <p className="text-neutral-600">{client.name}</p>
+                            <h2 className="text-xl font-medium">{client?.company}</h2>
+                            <p className="text-neutral-600">{client?.name}</p>
 
                             <div className="flex flex-wrap items-center mt-2 gap-x-4 gap-y-2">
                                 <div className="flex items-center text-neutral-600">
                                     <Mail size={16} className="mr-1" />
-                                    <span>{client.email}</span>
+                                    <span>{client?.email}</span>
                                 </div>
                                 <div className="flex items-center text-neutral-600">
                                     <Phone size={16} className="mr-1" />
-                                    <span>{client.phone}</span>
+                                    <span>{client?.phone}</span>
                                 </div>
                                 <div className="flex items-center text-neutral-600">
                                     <Calendar size={16} className="mr-1" />
-                                    <span>Client since {new Date(client.since).toLocaleDateString()}</span>
+                                    <span>Client since {new Date(client?.since).toLocaleDateString()}</span>
                                 </div>
                             </div>
                         </div>
@@ -249,10 +249,14 @@ const ClientInvoices = () => {
                                 onChange={(e) => setStatusFilter(e.target.value)}
                             >
                                 <option value="all">All Statuses</option>
-                                <option value="draft">Draft</option>
-                                <option value="sent">Sent</option>
-                                <option value="paid">Paid</option>
-                                <option value="overdue">Overdue</option>
+                                <option value="Pendding">Pending Payment</option>
+                                <option value="Processing">Processing</option>
+                                <option value="Hold">On Hold</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                                <option value="Refunded">Refunded</option>
+                                <option value="Failed">Failed</option>
+                                <option value="Draft">Draft</option>
                             </select>
                             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-500">

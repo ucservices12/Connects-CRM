@@ -102,7 +102,7 @@ const InvoiceSchema = new mongoose.Schema({
 
     status: {
         type: String,
-        enum: ['Draft', 'Sent', 'Paid', 'Overdue', 'Cancelled'],
+        enum: ['Pendding', 'Processing', 'Hold', 'Completed', 'Cancelled', 'Refunded', 'Failed', 'Draft'],
         default: 'Draft'
     },
 
@@ -168,9 +168,9 @@ const InvoiceSchema = new mongoose.Schema({
             bankName: { type: String, default: '' },
             accountName: { type: String, default: '' },
             accountNumber: { type: String, default: '' },
-            routingNumber: { type: String, default: '' },
-            paypal: { type: String, default: '' }
-        }
+            ifscCode: { type: String, default: '' },
+            upi: { type: String, default: '' }
+        },
     },
 
     createdAt: {
@@ -187,7 +187,7 @@ const InvoiceSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     }
-});
+})
 
 InvoiceSchema.pre('save', function (next) {
     this.updatedAt = Date.now();

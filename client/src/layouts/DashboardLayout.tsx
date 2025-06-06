@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
 import Navbar from '../components/layout/Navbar';
-import Footer from '../components/layout/Footer';
 import Breadcrumb from '../components/layout/Breadcrumb';
-import { useAuth } from '../contexts/AuthContext';
+import { useSelector } from 'react-redux';
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { pathname } = useLocation();
-  const { isLoading } = useAuth();
+  const { isLoading } = useSelector((state: any) => state.auth);
 
   // Close sidebar on route change on mobile devices
   useEffect(() => {

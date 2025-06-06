@@ -4,6 +4,7 @@ import { Users, Building2, CheckSquare, Calendar, FileText, Briefcase, Package, 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useAuth } from '../../contexts/AuthContext';
 import { format } from 'date-fns';
+import { useSelector } from 'react-redux';
 
 // Mock data
 const employeeData = [
@@ -34,7 +35,7 @@ const recentEmployees = [
 ];
 
 const AdminDashboard = () => {
-  const { user } = useAuth();
+  const user = useSelector((state) => state.auth.user);
   const [timeRange, setTimeRange] = useState('month');
   const today = new Date();
 

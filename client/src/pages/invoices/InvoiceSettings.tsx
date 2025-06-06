@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ChangeEvent } from 'react';
 import {
     ArrowLeft,
     Save,
@@ -7,13 +7,10 @@ import {
     CreditCard
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import {
-    createInvoiceSetting,
-    getInvoiceSetting
-} from '../../machine/invoice';
 import { toast } from '../../components/common/Toaster';
-import LoadingScreen from '../../components/common/LoadingScreen';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchInvoiceSettings, saveInvoiceSettings } from '../../redux/slices/invoiceSlice';
+import { AppDispatch, RootState } from '../../redux/store';
 
 type TabKey = 'company' | 'invoice' | 'payment';
 
@@ -42,7 +39,8 @@ const defaultSettings = {
         nextNumber: '',
         terms: '',
         notes: '',
-        defaultTax: 0
+        defaultTax: 0,
+        invoiceTypes: [] as string[]
     },
     payment: {
         bankName: '',
@@ -54,42 +52,41 @@ const defaultSettings = {
 };
 
 const InvoiceSettings: React.FC = () => {
-    const { user, organization } = useAuth();
+    const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
 
+    const { invoiceSettings, saving, error } = useSelector((state: RootState) => state.invoice);
     const [settings, setSettings] = useState<typeof defaultSettings>(defaultSettings);
     const [activeTab, setActiveTab] = useState<TabKey>('company');
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [logoFile, setLogoFile] = useState<File | null>(null);
-    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [newType, setNewType] = useState('');
+    const organization = useSelector((state: RootState) => state.auth.organization);
 
     useEffect(() => {
-        async function fetchSettings() {
-            try {
-                const response = await getInvoiceSetting(organization?._id);
-                if (response?.invoice) {
-                    const now = new Date();
-                    const year = now.getFullYear();
-                    const month = String(now.getMonth() + 1).padStart(2, '0');
-
-                    response.invoice.prefix = response.invoice.prefix || `${year}/${month}`;
-                    response.invoice.nextNumber = response.invoice.nextNumber || '0001';
-                }
-                setSettings(response);
-                if (response?.company?.logoUrl) {
-                    setLogoPreview(response.company.logoUrl);
-                }
-            } catch (err) {
-                setError("Failed to load settings.");
-            } finally {
-                setLoading(false);
-            }
+        if (organization?._id) {
+            dispatch(fetchInvoiceSettings(organization._id));
         }
+    }, [organization?._id, dispatch]);
 
-        if (organization?._id) fetchSettings();
-    }, [organization?._id]);
+    useEffect(() => {
+        if (invoiceSettings && Object.keys(invoiceSettings).length > 0) {
+            setSettings(prev => ({
+                ...prev,
+                company: {
+                    ...prev.company,
+                    ...invoiceSettings.company
+                },
+                invoice: {
+                    ...prev.invoice,
+                    ...invoiceSettings.invoice,
+                    invoiceTypes: invoiceSettings.invoice?.invoiceTypes ?? []
+                },
+                payment: {
+                    ...prev.payment,
+                    ...invoiceSettings.payment
+                }
+            }));
+        }
+    }, [invoiceSettings]);
 
     const handleChange = (
         section: keyof typeof settings,
@@ -105,44 +102,64 @@ const InvoiceSettings: React.FC = () => {
         }));
     };
 
-    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleLogoChange = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file && /\.(png|jpe?g)$/i.test(file.name)) {
-            setLogoFile(file);
-            const objectUrl = URL.createObjectURL(file);
-            setLogoPreview(objectUrl);
-
-            // Simulating upload URL assignment
-            setSettings(prev => ({
-                ...prev,
-                company: {
-                    ...prev.company,
-                    logoUrl: objectUrl // In real app, replace with uploaded URL
-                }
-            }));
-        } else {
-            toast.error("Logo must be a .png or .jpg/.jpeg image.");
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setSettings(prev => ({
+                    ...prev,
+                    company: {
+                        ...prev.company,
+                        logoUrl: reader.result as string
+                    }
+                }));
+            };
+            reader.readAsDataURL(file);
         }
+    };
+
+    const handleAddInvoiceType = () => {
+        const trimmed = newType.trim();
+        if (!trimmed) return;
+        if (settings.invoice.invoiceTypes.includes(trimmed)) {
+            toast.error('Invoice type already exists.');
+            return;
+        }
+        setSettings(prev => ({
+            ...prev,
+            invoice: {
+                ...prev.invoice,
+                invoiceTypes: [...prev.invoice.invoiceTypes, trimmed]
+            }
+        }));
+        setNewType('');
+    };
+
+    const handleRemoveInvoiceType = (typeToRemove: string) => {
+        setSettings(prev => ({
+            ...prev,
+            invoice: {
+                ...prev.invoice,
+                invoiceTypes: prev.invoice.invoiceTypes.filter(t => t !== typeToRemove)
+            }
+        }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSaving(true);
+        if (!organization?._id) return;
 
         try {
             const payload = {
                 orgId: organization._id,
                 settings
             };
-
-            const response = await createInvoiceSetting(payload);
-            console.log("create/update setting::", response);
+            await dispatch(saveInvoiceSettings(payload)).unwrap();
             toast.success("Invoice settings saved successfully.");
-        } catch (error) {
-            console.error("Save settings error:", error);
+        } catch (err) {
             toast.error("Failed to save settings.");
-        } finally {
-            setSaving(false);
+            console.error("Save settings error:", err);
         }
     };
 
@@ -151,7 +168,7 @@ const InvoiceSettings: React.FC = () => {
             case 'company':
                 return (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
-                        {['name', 'email', 'address', 'phone', 'website', 'gst', 'tan'].map(field => (
+                        {['name', 'email', 'address', 'phone', 'website', 'gst', 'tan', 'city', 'state', 'zip'].map(field => (
                             <div key={field} className="form-group">
                                 <label className="form-label capitalize">
                                     {field.toUpperCase() === 'GST'
@@ -163,44 +180,26 @@ const InvoiceSettings: React.FC = () => {
                                 <input
                                     type={field === 'email' ? 'email' : 'text'}
                                     className="form-input"
-                                    value={settings.company?.[field] ?? ''}
+                                    value={settings?.company?.[field] ?? ''}
                                     onChange={e => handleChange('company', field, e.target.value)}
                                 />
                             </div>
                         ))}
-
-                        {['city', 'state', 'zip'].map(field => (
-                            <div key={field} className="form-group">
-                                <label className="form-label capitalize">{field}</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={settings.company?.[field] ?? ''}
-                                    onChange={e => handleChange('company', field, e.target.value)}
+                        <div className="form-group sm:col-span-2">
+                            <label className="form-label">Company Logo</label>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="form-input"
+                                onChange={handleLogoChange}
+                            />
+                            {settings?.company?.logoUrl && (
+                                <img
+                                    src={settings?.company?.logoUrl}
+                                    alt="Logo Preview"
+                                    className="mt-2 w-32 h-32 object-contain border rounded"
                                 />
-                            </div>
-                        ))}
-
-                        {/* Logo File Input */}
-                        <div className="form-group sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label className="form-label">Company Logo (PNG/JPG)</label>
-                                <input
-                                    type="file"
-                                    accept=".png,.jpg,.jpeg"
-                                    className="form-input"
-                                    onChange={handleLogoChange}
-                                />
-                                {logoPreview && (
-                                    <div className="mt-2">
-                                        <img
-                                            src={logoPreview}
-                                            alt="Logo Preview"
-                                            className="h-20 w-auto object-contain border rounded"
-                                        />
-                                    </div>
-                                )}
-                            </div>
+                            )}
                         </div>
                     </div>
                 );
@@ -213,7 +212,7 @@ const InvoiceSettings: React.FC = () => {
                             <input
                                 type="text"
                                 className="form-input"
-                                value={settings.invoice?.prefix ?? ''}
+                                value={settings?.invoice?.prefix ?? ''}
                                 onChange={e => handleChange('invoice', 'prefix', e.target.value)}
                             />
                         </div>
@@ -222,7 +221,7 @@ const InvoiceSettings: React.FC = () => {
                             <input
                                 type="text"
                                 className="form-input"
-                                value={settings.invoice?.nextNumber ?? ''}
+                                value={settings?.invoice?.nextNumber ?? ''}
                                 onChange={e => handleChange('invoice', 'nextNumber', e.target.value)}
                             />
                         </div>
@@ -233,27 +232,72 @@ const InvoiceSettings: React.FC = () => {
                                 min={0}
                                 max={100}
                                 className="form-input"
-                                value={settings.invoice?.defaultTax ?? 0}
+                                value={settings?.invoice?.defaultTax ?? 0}
                                 onChange={e => handleChange('invoice', 'defaultTax', Number(e.target.value))}
                             />
                         </div>
-                        <div className="form-group sm:col-span-2">
+                        <div className="form-group">
                             <label className="form-label">Terms</label>
                             <textarea
                                 className="form-input"
                                 rows={2}
-                                value={settings.invoice?.terms ?? ''}
+                                value={settings?.invoice?.terms ?? ''}
                                 onChange={e => handleChange('invoice', 'terms', e.target.value)}
                             />
                         </div>
-                        <div className="form-group sm:col-span-2">
+                        <div className="form-group">
                             <label className="form-label">Notes</label>
                             <textarea
                                 className="form-input"
                                 rows={2}
-                                value={settings.invoice?.notes ?? ''}
+                                value={settings?.invoice?.notes ?? ''}
                                 onChange={e => handleChange('invoice', 'notes', e.target.value)}
                             />
+                        </div>
+                        {/* Custom Invoice Types */}
+                        <div className="form-group">
+                            <label className="form-label">Invoice Types</label>
+                            <div className="flex gap-2 mb-2">
+                                <input
+                                    type="text"
+                                    className="form-input flex-1"
+                                    placeholder="Add new invoice type"
+                                    value={newType}
+                                    onChange={e => setNewType(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleAddInvoiceType();
+                                        }
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    onClick={handleAddInvoiceType}
+                                >
+                                    Add
+                                </button>
+                            </div>
+
+                            {Array.isArray(settings?.invoice?.invoiceTypes) && settings?.invoice?.invoiceTypes.length > 0 ? (
+                                <ul className="flex flex-wrap gap-2">
+                                    {settings?.invoice?.invoiceTypes?.map(type => (
+                                        <li key={type} className="bg-gray-100 px-3 py-1 rounded-full flex items-center">
+                                            <span className="mr-2 text-sm">{type}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveInvoiceType(type)}
+                                                className="text-red-500 hover:text-red-700"
+                                            >
+                                                ×
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-sm text-neutral-500 italic">No invoice types added yet.</p>
+                            )}
                         </div>
                     </div>
                 );
@@ -264,16 +308,12 @@ const InvoiceSettings: React.FC = () => {
                         {['bankName', 'accountName', 'accountNumber', 'ifscCode', 'upi'].map(field => (
                             <div key={field} className="form-group">
                                 <label className="form-label capitalize">
-                                    {field === 'upi'
-                                        ? 'UPI ID'
-                                        : field === 'ifscCode'
-                                            ? 'IFSC Code'
-                                            : field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                                    {field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                                 </label>
                                 <input
                                     type="text"
                                     className="form-input"
-                                    value={settings.payment?.[field] ?? ''}
+                                    value={settings?.payment?.[field] ?? ''}
                                     onChange={e => handleChange('payment', field, e.target.value)}
                                 />
                             </div>
@@ -282,8 +322,6 @@ const InvoiceSettings: React.FC = () => {
                 );
         }
     };
-
-    if (loading) return <LoadingScreen />;
 
     return (
         <>

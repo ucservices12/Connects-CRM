@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-    Search, Filter, PlusCircle, Download, Eye, Edit,
-    Trash2, CheckCircle, AlertTriangle, Clock, FileText,
-    ChevronLeft, ChevronRight,
-    X
+    Search, PlusCircle, Download, Eye, Edit,
+    Trash2, CheckCircle, Clock, FileText,
+    X, Loader, Pause, RefreshCw, XCircle
 } from 'lucide-react';
-import LoadingScreen from '../../components/common/LoadingScreen';
-import { deleteInvoice, getInvoices } from '../../machine/invoice';
-import { useAuth } from '../../contexts/AuthContext';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchInvoices, deleteInvoiceAsync } from '../../redux/slices/invoiceSlice';
 import {
-    Chip,
     Typography,
     TextField,
     InputAdornment,
@@ -20,20 +17,21 @@ import {
     MenuItem,
     Button,
     Stack,
-    Pagination
+    Pagination,
+    Chip
 } from '@mui/material';
 import { toast } from '../../components/common/Toaster';
 
-const getStatusBadge = (status: string) => {
+export const getStatusBadge = (status: string) => {
     switch (status) {
-        case 'Paid':
+        case 'Pendding':
             return (
                 <Chip
-                    icon={<CheckCircle size={16} color='#00c853' />}
-                    label="Paid"
+                    icon={<Clock size={16} color="#FF9800" />}
+                    label="Pending"
                     sx={{
-                        backgroundColor: '#E6F4EA',
-                        color: '#00c853',
+                        backgroundColor: '#FFF3E0',
+                        color: '#FF9800',
                         paddingX: 1.5,
                         paddingY: 0.5,
                         fontWeight: 500,
@@ -43,14 +41,14 @@ const getStatusBadge = (status: string) => {
                     size="small"
                 />
             );
-        case 'Sent':
+        case 'Processing':
             return (
                 <Chip
-                    icon={<Clock size={16} color='#1565C0' />}
-                    label="Sent"
+                    icon={<Loader size={16} color="#1976D2" />}
+                    label="Processing"
                     sx={{
                         backgroundColor: '#E3F2FD',
-                        color: '#1565C0',
+                        color: '#1976D2',
                         paddingX: 1.5,
                         paddingY: 0.5,
                         fontWeight: 500,
@@ -60,14 +58,31 @@ const getStatusBadge = (status: string) => {
                     size="small"
                 />
             );
-        case 'Overdue':
+        case 'Hold':
             return (
                 <Chip
-                    icon={<AlertTriangle size={16} color='#f44336' />}
-                    label="Overdue"
+                    icon={<Pause size={16} color="#FFB300" />}
+                    label="On Hold"
                     sx={{
-                        backgroundColor: '#FFEBEE',
-                        color: '#f44336',
+                        backgroundColor: '#FFF8E1',
+                        color: '#FFB300',
+                        paddingX: 1.5,
+                        paddingY: 0.5,
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                        borderRadius: '8px',
+                    }}
+                    size="small"
+                />
+            );
+        case 'Completed':
+            return (
+                <Chip
+                    icon={<CheckCircle size={16} color="#388E3C" />}
+                    label="Completed"
+                    sx={{
+                        backgroundColor: '#E8F5E9',
+                        color: '#388E3C',
                         paddingX: 1.5,
                         paddingY: 0.5,
                         fontWeight: 500,
@@ -80,7 +95,7 @@ const getStatusBadge = (status: string) => {
         case 'Cancelled':
             return (
                 <Chip
-                    icon={<X size={16} color='#f44336' />}
+                    icon={<X size={16} color="#f44336" />}
                     label="Cancelled"
                     sx={{
                         backgroundColor: '#FFEBEE',
@@ -94,14 +109,49 @@ const getStatusBadge = (status: string) => {
                     size="small"
                 />
             );
+        case 'Refunded':
+            return (
+                <Chip
+                    icon={<RefreshCw size={16} color="#6A1B9A" />}
+                    label="Refunded"
+                    sx={{
+                        backgroundColor: '#F3E5F5',
+                        color: '#6A1B9A',
+                        paddingX: 1.5,
+                        paddingY: 0.5,
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                        borderRadius: '8px',
+                    }}
+                    size="small"
+                />
+            );
+        case 'Failed':
+            return (
+                <Chip
+                    icon={<XCircle size={16} color="#D32F2F" />}
+                    label="Failed"
+                    sx={{
+                        backgroundColor: '#FFEBEE',
+                        color: '#D32F2F',
+                        paddingX: 1.5,
+                        paddingY: 0.5,
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                        borderRadius: '8px',
+                    }}
+                    size="small"
+                />
+            );
+        case 'Draft':
         default:
             return (
                 <Chip
-                    icon={<FileText size={16} />}
+                    icon={<FileText size={16} color="#455A64" />}
                     label="Draft"
                     sx={{
                         backgroundColor: '#ECEFF1',
-                        color: '#37474F',
+                        color: '#455A64',
                         paddingX: 1.5,
                         paddingY: 0.5,
                         fontWeight: 500,
@@ -115,30 +165,24 @@ const getStatusBadge = (status: string) => {
 };
 
 const InvoiceList = () => {
-    const { organization } = useAuth();
-    const [invoices, setInvoices] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
+    const { organization } = useSelector((state: any) => state.auth);
+    const { invoices } = useSelector((state: any) => state.invoice);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
     useEffect(() => {
-        const fetchInvoices = async () => {
-            try {
-                const response = await getInvoices(currentPage, itemsPerPage, organization._id);
-                if (response.success === true) {
-                    setInvoices(response?.data);
-                }
-                setLoading(false);
-            } catch (error) {
-                setLoading(false);
-            }
-        };
-        fetchInvoices();
-    }, []);
+        if (organization) {
+            dispatch(fetchInvoices({
+                currentPage,
+                itemsPerPage,
+                orgId: organization._id,
+            }));
+        }
+    }, [dispatch, currentPage, organization]);
 
-    // Filter invoices based on search term and status filter
     const filteredInvoices = invoices.filter(invoice => {
         const invoiceNo = invoice?.invoiceNo || '';
         const companyName = invoice?.client?.companyName || '';
@@ -153,7 +197,6 @@ const InvoiceList = () => {
         return matchesSearch && matchesStatus;
     });
 
-    // Pagination
     const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
     const paginatedInvoices = filteredInvoices.slice(
         (currentPage - 1) * itemsPerPage,
@@ -166,27 +209,25 @@ const InvoiceList = () => {
 
     const handleDelete = async (id: string) => {
         try {
-            await deleteInvoice(id);
-            setInvoices(prev => prev.filter(inv => inv._id !== id));
-            toast.success('Invoice deleted successfully!');
+            const res = await dispatch(deleteInvoiceAsync(id));
+
+            if (res.meta.requestStatus == "rejected") {
+                toast.error('Cant deleted paid invoice!');
+            } else {
+                toast.success('Invoice deleted successfully!');
+
+            }
         } catch (error) {
             toast.error('Failed to delete invoice');
         }
     };
 
-    if (loading) {
-        return <LoadingScreen />;
-    }
-
     return (
         <>
             <div className="flex justify-between items-center mb-6">
-                <Typography variant="h5">
-                    Invoices
-                </Typography>
+                <Typography variant="h5">Invoices</Typography>
                 <Link to="/invoices/create" className="btn-primary">
-                    <PlusCircle size={18} />
-                    Create Invoice
+                    <PlusCircle size={18} /> Create Invoice
                 </Link>
             </div>
 
@@ -219,11 +260,14 @@ const InvoiceList = () => {
                                 onChange={(e) => setStatusFilter(e.target.value)}
                             >
                                 <MenuItem value="all">All Statuses</MenuItem>
-                                <MenuItem value="draft">Draft</MenuItem>
-                                <MenuItem value="sent">Sent</MenuItem>
-                                <MenuItem value="paid">Paid</MenuItem>
-                                <MenuItem value="overdue">Overdue</MenuItem>
+                                <MenuItem value="Pendding">Pending Payment</MenuItem>
+                                <MenuItem value="Processing">Processing</MenuItem>
+                                <MenuItem value="Hold">On Hold</MenuItem>
+                                <MenuItem value="Completed">Completed</MenuItem>
                                 <MenuItem value="Cancelled">Cancelled</MenuItem>
+                                <MenuItem value="Refunded">Refunded</MenuItem>
+                                <MenuItem value="Failed">Failed</MenuItem>
+                                <MenuItem value="Draft">Draft</MenuItem>
                             </Select>
                         </FormControl>
                         <Button
@@ -237,9 +281,8 @@ const InvoiceList = () => {
                 </div>
             </div>
 
-            {/* Responsive Invoice List */}
+            {/* Table View */}
             <div className="overflow-hidden card p-0 rounded-none">
-                {/* Desktop Table */}
                 <div className="hidden md:block overflow-x-auto">
                     <table className="w-full">
                         <thead>
@@ -269,10 +312,18 @@ const InvoiceList = () => {
                                         <div className="text-sm text-neutral-500 capitalize">{invoice?.client?.name}</div>
                                     </td>
                                     <td className="py-3 px-4">
-                                        {new Date(invoice?.createdAt).toLocaleDateString('en-IN')}
+                                        {new Date(invoice?.createdAt).toLocaleString('en-IN', {
+                                            dateStyle: 'short',
+                                            timeStyle: 'short',
+                                            hour12: true
+                                        })}
                                     </td>
                                     <td className="py-3 px-4">
-                                        {new Date(invoice?.dueDate).toLocaleDateString('en-IN')}
+                                        {new Date(invoice?.dueDate).toLocaleString('en-IN', {
+                                            dateStyle: 'short',
+                                            timeStyle: 'short',
+                                            hour12: true
+                                        })}
                                     </td>
                                     <td className="py-3 px-4 text-right font-medium">
                                         ₹{invoice?.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -337,8 +388,16 @@ const InvoiceList = () => {
                             <div className="text-sm text-neutral-700">{invoice?.client.companyName}</div>
                             <div className="text-xs text-neutral-500">{invoice?.client?.name}</div>
                             <div className="flex justify-between text-xs mt-2">
-                                <span>Issue: {new Date(invoice?.createdAt).toLocaleDateString('en-IN')}</span>
-                                <span>Due: {new Date(invoice?.dueDate).toLocaleDateString('en-IN')}</span>
+                                <span>Issue: {new Date(invoice?.createdAt).toLocaleString('en-IN', {
+                                    dateStyle: 'short',
+                                    timeStyle: 'short',
+                                    hour12: true
+                                })}</span>
+                                <span>Due: {new Date(invoice?.dueDate).toLocaleString('en-IN', {
+                                    dateStyle: 'short',
+                                    timeStyle: 'short',
+                                    hour12: true
+                                })}</span>
                             </div>
                             <div className="flex justify-between items-center mt-2">
                                 <span className="font-medium text-lg text-green-700">

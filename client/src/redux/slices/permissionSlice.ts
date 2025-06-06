@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+// features/permissions/permissionSlice.ts
+
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 interface Permission {
     id: string;
@@ -8,13 +10,7 @@ interface Permission {
     roles: string[];
 }
 
-interface PermissionContextType {
-    permissions: Permission[];
-    togglePermission: (id: string, role: string) => void;
-    hasPermission: (permissionName: string, role: string) => boolean;
-}
-
-const defaultPermissions: Permission[] = [
+const initialState: Permission[] = [
     {
         id: 'dashboard_access',
         name: 'Dashboard Access',
@@ -87,40 +83,30 @@ const defaultPermissions: Permission[] = [
     }
 ];
 
-const PermissionContext = createContext<PermissionContextType>({
-    permissions: defaultPermissions,
-    togglePermission: () => { },
-    hasPermission: () => false,
+interface TogglePayload {
+    id: string;
+    role: string;
+}
+
+const permissionSlice = createSlice({
+    name: 'permissions',
+    initialState,
+    reducers: {
+        togglePermission(state, action: PayloadAction<TogglePayload>) {
+            const { id, role } = action.payload;
+            return state.map(permission => {
+                if (permission.id !== id) return permission;
+                const hasRole = permission.roles.includes(role);
+                return {
+                    ...permission,
+                    roles: hasRole
+                        ? permission.roles.filter(r => r !== role)
+                        : [...permission.roles, role]
+                };
+            });
+        }
+    }
 });
 
-export const usePermissions = () => useContext(PermissionContext);
-
-export const PermissionProvider = ({ children }: { children: ReactNode }) => {
-    const [permissions, setPermissions] = useState<Permission[]>(defaultPermissions);
-
-    const togglePermission = (id: string, role: string) => {
-        setPermissions(prev =>
-            prev.map(permission =>
-                permission.id === id
-                    ? {
-                        ...permission,
-                        roles: permission.roles.includes(role)
-                            ? permission.roles.filter(r => r !== role)
-                            : [...permission.roles, role]
-                    }
-                    : permission
-            )
-        );
-    };
-
-    const hasPermission = (permissionName: string, role: string) => {
-        const permission = permissions.find(p => p.id === permissionName);
-        return permission?.roles.includes(role) ?? false;
-    };
-
-    return (
-        <PermissionContext.Provider value={{ permissions, togglePermission, hasPermission }}>
-            {children}
-        </PermissionContext.Provider>
-    );
-};
+export const { togglePermission } = permissionSlice.actions;
+export default permissionSlice.reducer;

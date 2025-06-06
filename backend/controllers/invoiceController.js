@@ -145,7 +145,7 @@ exports.updateInvoice = async (req, res, next) => {
         }
 
         // If the invoice is paid and already edited once, block further updates
-        if (invoice.status === 'Paid' && invoice.wasPaidInvoiceEdited) {
+        if (invoice.status === 'Completed' && invoice.wasPaidInvoiceEdited) {
             return res.status(400).json({
                 success: false,
                 message: `Cannot update a paid invoice more than once`
@@ -172,7 +172,7 @@ exports.updateInvoice = async (req, res, next) => {
         }
 
         // If invoice is Paid and hasn't been edited yet, mark it as edited
-        if (invoice.status === 'Paid' && !invoice.wasPaidInvoiceEdited) {
+        if (invoice.status === 'Completed' && !invoice.wasPaidInvoiceEdited) {
             req.body.wasPaidInvoiceEdited = true;
         }
 
@@ -215,7 +215,7 @@ exports.deleteInvoice = async (req, res, next) => {
         }
 
         // Don't allow deleting paid invoices
-        if (invoice.status === 'Paid') {
+        if (invoice.status === 'Completed') {
             return res.status(400).json({
                 success: false,
                 message: `Cannot delete a paid invoice`
@@ -237,6 +237,8 @@ exports.deleteInvoice = async (req, res, next) => {
 // @route   GET /api/v1/invoices/:id/pdf
 // @access  Private
 exports.generateInvoicePDF = async (req, res, next) => {
+    console.log("generateInvoicePDf", req.body)
+
     try {
         const invoice = await Invoice.findById(req.params.id);
 
@@ -248,19 +250,19 @@ exports.generateInvoicePDF = async (req, res, next) => {
         }
 
         // Defensive check for organizationId
-        if (!invoice.organizationId || !req.organizationId) {
+        if (!invoice.orgId || !req.organizationId) {
             return res.status(400).json({
                 success: false,
                 message: `Organization ID missing`
             });
         }
 
-        if (invoice.organizationId.toString() !== req.organizationId.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: `Not authorized to access this invoice`
-            });
-        }
+        // if (invoice.orgId.toString() !== req.orgId.toString()) {
+        //     return res.status(403).json({
+        //         success: false,
+        //         message: `Not authorized to access this invoice`
+        //     });
+        // }
 
         // Generate PDF
         const pdf = await generatePDF(invoice);

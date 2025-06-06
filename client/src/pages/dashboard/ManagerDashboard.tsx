@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Building2, CheckSquare, TrendingUp, Clock, ChevronRight, Plus } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { useAuth } from '../../contexts/AuthContext';
 import { format } from 'date-fns';
+import { useSelector } from 'react-redux';
 
 // Mock data
 const taskCompletionData = [
@@ -36,10 +36,10 @@ const recentTasks = [
 ];
 
 const ManagerDashboard = () => {
-  const { user } = useAuth();
+  const user = useSelector((state) => state.auth.user);
   const [timeRange, setTimeRange] = useState('month');
   const today = new Date();
-  
+
   // Priority badge color
   const getPriorityBadgeColor = (priority: string) => {
     switch (priority.toLowerCase()) {
@@ -53,7 +53,7 @@ const ManagerDashboard = () => {
         return 'bg-neutral-100 text-neutral-800';
     }
   };
-  
+
   // Status badge color
   const getStatusBadgeColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -69,7 +69,7 @@ const ManagerDashboard = () => {
         return 'bg-neutral-100 text-neutral-800';
     }
   };
-  
+
   return (
     <div className="animate-fade-in">
       {/* Header */}
@@ -101,7 +101,7 @@ const ManagerDashboard = () => {
           {format(today, 'EEEE, MMMM d, yyyy')}
         </div>
       </div>
-      
+
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="card">
@@ -121,7 +121,7 @@ const ManagerDashboard = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="card">
           <div className="flex items-start">
             <div className="p-3 rounded-md bg-accent-100 text-accent-700">
@@ -139,7 +139,7 @@ const ManagerDashboard = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="card">
           <div className="flex items-start">
             <div className="p-3 rounded-md bg-success-100 text-success-700">
@@ -157,7 +157,7 @@ const ManagerDashboard = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="card">
           <div className="flex items-start">
             <div className="p-3 rounded-md bg-warning-100 text-warning-700">
@@ -176,7 +176,7 @@ const ManagerDashboard = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="card">
@@ -197,7 +197,7 @@ const ManagerDashboard = () => {
             </ResponsiveContainer>
           </div>
         </div>
-        
+
         <div className="card">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-neutral-900">Client Conversion</h3>
@@ -217,7 +217,7 @@ const ManagerDashboard = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Quick Access */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="card bg-primary-50 border border-primary-100">
@@ -233,7 +233,7 @@ const ManagerDashboard = () => {
             </Link>
           </div>
         </div>
-        
+
         <div className="card bg-accent-50 border border-accent-100">
           <h3 className="text-lg font-medium text-accent-900 mb-3">Manage Clients</h3>
           <p className="text-sm text-accent-700 mb-4">Add, edit, or review client information.</p>
@@ -247,7 +247,7 @@ const ManagerDashboard = () => {
             </Link>
           </div>
         </div>
-        
+
         <div className="card bg-success-50 border border-success-100">
           <h3 className="text-lg font-medium text-success-900 mb-3">Performance</h3>
           <p className="text-sm text-success-700 mb-4">Review team performance metrics.</p>
@@ -259,7 +259,7 @@ const ManagerDashboard = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Team Performance */}
       <div className="card mb-6">
         <div className="flex justify-between items-center mb-4">
@@ -269,7 +269,7 @@ const ManagerDashboard = () => {
             <ChevronRight size={16} />
           </Link>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-neutral-200">
             <thead>
@@ -298,12 +298,11 @@ const ManagerDashboard = () => {
                     <div className="flex flex-col items-center">
                       <div className="text-sm font-medium text-neutral-900">{member.taskCompletion}%</div>
                       <div className="w-full bg-neutral-200 rounded-full h-2 mt-1">
-                        <div 
-                          className={`h-2 rounded-full ${
-                            member.taskCompletion >= 90 ? 'bg-success-500' : 
-                            member.taskCompletion >= 75 ? 'bg-primary-500' : 
-                            'bg-warning-500'
-                          }`}
+                        <div
+                          className={`h-2 rounded-full ${member.taskCompletion >= 90 ? 'bg-success-500' :
+                            member.taskCompletion >= 75 ? 'bg-primary-500' :
+                              'bg-warning-500'
+                            }`}
                           style={{ width: `${member.taskCompletion}%` }}
                         ></div>
                       </div>
@@ -323,7 +322,7 @@ const ManagerDashboard = () => {
           </table>
         </div>
       </div>
-      
+
       {/* Recent Tasks & Upcoming Events */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card lg:col-span-2">
@@ -334,7 +333,7 @@ const ManagerDashboard = () => {
               <ChevronRight size={16} />
             </Link>
           </div>
-          
+
           <div className="space-y-3">
             {recentTasks.map((task) => (
               <div key={task.id} className="flex items-start p-3 rounded-lg border border-neutral-200 hover:border-primary-200 hover:bg-neutral-50">
@@ -368,12 +367,12 @@ const ManagerDashboard = () => {
             ))}
           </div>
         </div>
-        
+
         <div className="card">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-neutral-900">Upcoming Events</h3>
           </div>
-          
+
           <div className="space-y-3">
             <div className="flex items-start p-3 rounded-lg border border-primary-100 bg-primary-50">
               <div className="p-2 rounded-md bg-primary-100 text-primary-700">
@@ -384,7 +383,7 @@ const ManagerDashboard = () => {
                 <p className="text-xs text-neutral-500">Tomorrow, 10:00 AM - 11:30 AM</p>
               </div>
             </div>
-            
+
             <div className="flex items-start p-3 rounded-lg border border-accent-100 bg-accent-50">
               <div className="p-2 rounded-md bg-accent-100 text-accent-700">
                 <Building2 size={20} />
@@ -394,7 +393,7 @@ const ManagerDashboard = () => {
                 <p className="text-xs text-neutral-500">Oct 20, 2023, 2:00 PM - 3:30 PM</p>
               </div>
             </div>
-            
+
             <div className="flex items-start p-3 rounded-lg border border-success-100 bg-success-50">
               <div className="p-2 rounded-md bg-success-100 text-success-700">
                 <TrendingUp size={20} />

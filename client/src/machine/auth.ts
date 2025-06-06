@@ -14,15 +14,12 @@ export const getAuthHeader = () => {
     };
 };
 
-export const loginUser = async (credentials, navigate) => {
+export const loginUser = async (credentials) => {
     try {
         const response = await axios.post(`${API}/login`, credentials);
         const token = response.data.token;
         localStorage.setItem("token", token);
         console.log("login user", response.data);
-        if (token) {
-            navigate("/")
-        }
         return response.data;
     } catch (error) {
         console.error("Login failed:", error.response?.data?.error || error.message);

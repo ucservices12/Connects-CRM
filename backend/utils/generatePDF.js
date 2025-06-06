@@ -6,9 +6,9 @@ const pdf = require('html-pdf');
  * @returns {Promise<Buffer>} - PDF buffer
  */
 const generatePDF = (invoice) => {
-    return new Promise((resolve, reject) => {
-        // Create HTML template
-        const html = `
+  return new Promise((resolve, reject) => {
+    // Create HTML template
+    const html = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -157,26 +157,26 @@ const generatePDF = (invoice) => {
       </html>
     `;
 
-        // Options for PDF generation
-        const options = {
-            format: 'A4',
-            border: {
-                top: '15mm',
-                right: '15mm',
-                bottom: '15mm',
-                left: '15mm'
-            }
-        };
+    // Options for PDF generation
+    const options = {
+      format: 'A4',
+      border: {
+        top: '15mm',
+        right: '15mm',
+        bottom: '15mm',
+        left: '15mm'
+      }
+    };
 
-        // Generate PDF
-        pdf.create(html, options).toBuffer((err, buffer) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(buffer);
-            }
-        });
+    // Generate PDF
+    pdf.create(html, options).toBuffer((err, buffer) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(buffer);
+      }
     });
+  });
 };
 
 module.exports = generatePDF;

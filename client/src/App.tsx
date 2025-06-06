@@ -1,12 +1,13 @@
-import React, { useEffect, lazy, Suspense } from 'react';
+import React, { useEffect, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { PermissionProvider } from './contexts/PermissionContext';
-import { useAuth } from './contexts/AuthContext';
 
 // Layouts
 import DashboardLayout from './layouts/DashboardLayout';
 import AuthLayout from './layouts/AuthLayout';
 import LoadingScreen from './components/common/LoadingScreen';
+import { useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
+import { checkAuth, fetchOrganization } from './redux/slices/authSlice';
 
 // Auth Pages
 const Login = React.lazy(() => import('./pages/auth/Login'));
@@ -88,18 +89,24 @@ const RecurringInvoiceDetail = React.lazy(() => import('./pages/invoices/Recurri
 const NotFound = React.lazy(() => import('./pages/error/NotFound'));
 
 function App() {
-  const { isAuthenticated, user, checkAuth } = useAuth();
+  const dispatch = useDispatch();
   const location = useLocation();
 
+  const { isLoading, isAuthenticated, user } = useSelector((state: any) => state.auth);
+
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    dispatch(checkAuth());
+  }, [dispatch]);
 
-  // Redirect based on role
+  // Fetch organization when user is authenticated
+  useEffect(() => {
+    if (user?.organization && isAuthenticated) {
+      dispatch(fetchOrganization(user.organization));
+    }
+  }, [dispatch, user, isAuthenticated]);
+
   const getDashboardPath = () => {
-    if (!user?.role) return '/dashboard/employee';
-
-    switch (user.role) {
+    switch (user?.role) {
       case 'admin':
         return '/dashboard/admin';
       case 'hr':
@@ -112,7 +119,7 @@ function App() {
   };
 
   // Role-based access control
-  const ProtectedRoute = ({ children, requiredRoles = [] }: { children: JSX.Element, requiredRoles?: string[] }) => {
+  const ProtectedRoute = ({ children, requiredRoles = [] }: { children: JSX.Element; requiredRoles?: string[] }) => {
     if (!isAuthenticated) {
       return <Navigate to="/login" state={{ from: location }} replace />;
     }
@@ -124,241 +131,243 @@ function App() {
     return children;
   };
 
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
   return (
-    <PermissionProvider>
-      <Suspense fallback={<LoadingScreen />}>
-        <Routes>
-          {/* Auth Routes */}
-          <Route element={<AuthLayout />}>
-            <Route path="/login" element={
-              isAuthenticated ? <Navigate to={getDashboardPath()} replace /> : <Login />
-            } />
-            <Route path="/register" element={
-              isAuthenticated ? <Navigate to={getDashboardPath()} replace /> : <Register />
-            } />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/verify-otp" element={<VerifyOtp />} />
-            <Route path="/create-organization" element={<CreateOrganazation />} />
-          </Route>
+    <Suspense fallback={<LoadingScreen />}>
+      <Routes>
+        {/* Auth Routes */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={
+            isAuthenticated ? <Navigate to={getDashboardPath()} replace /> : <Login />
+          } />
+          <Route path="/register" element={
+            isAuthenticated ? <Navigate to={getDashboardPath()} replace /> : <Register />
+          } />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/verify-otp" element={<VerifyOtp />} />
+          <Route path="/create-organization" element={<CreateOrganazation />} />
+        </Route>
 
-          <Route path="/pricing-plan" element={<PricingPlans />} />
+        <Route path="/pricing-plan" element={<PricingPlans />} />
 
-          {/* Dashboard Routes */}
-          <Route element={
-            <ProtectedRoute>
-              <DashboardLayout />
+        {/* Dashboard Routes */}
+        <Route element={
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }>
+          {/* Default redirect */}
+          <Route path="/" element={<Navigate to={getDashboardPath()} replace />} />
+          <Route path="/dashboard" element={<Navigate to={getDashboardPath()} replace />} />
+
+          {/* Role-specific dashboards */}
+          <Route path="/dashboard/admin" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <AdminDashboard />
             </ProtectedRoute>
-          }>
-            {/* Default redirect */}
-            <Route path="/" element={<Navigate to={getDashboardPath()} replace />} />
-            <Route path="/dashboard" element={<Navigate to={getDashboardPath()} replace />} />
+          } />
+          <Route path="/dashboard/hr" element={
+            <ProtectedRoute requiredRoles={['admin', 'hr']}>
+              <HRDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/dashboard/manager" element={
+            <ProtectedRoute requiredRoles={['admin', 'manager']}>
+              <ManagerDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/dashboard/employee" element={<EmployeeDashboard />} />
 
-            {/* Role-specific dashboards */}
-            <Route path="/dashboard/admin" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/dashboard/hr" element={
-              <ProtectedRoute requiredRoles={['admin', 'hr']}>
-                <HRDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/dashboard/manager" element={
-              <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                <ManagerDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/dashboard/employee" element={<EmployeeDashboard />} />
+          {/* profile page */}
+          <Route path="/profile" element={<UserProfile />} />
 
-            {/* profile page */}
-            <Route path="/profile" element={<UserProfile />} />
+          <Route path="/dashboard/permissions" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <Permissions />
+            </ProtectedRoute>
+          } />
 
-            <Route path="/dashboard/permissions" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <Permissions />
-              </ProtectedRoute>
-            } />
+          {/* Employee Management */}
+          <Route path="/employees" element={
+            <ProtectedRoute requiredRoles={['admin', 'hr']}>
+              <EmployeeList />
+            </ProtectedRoute>
+          } />
+          <Route path="/employees/add" element={
+            <ProtectedRoute requiredRoles={['admin', 'hr']}>
+              <AddEmployee />
+            </ProtectedRoute>
+          } />
+          <Route path="/employees/:id" element={<EmployeeProfile />} />
+          <Route path="/employees/:id/edit" element={
+            <ProtectedRoute requiredRoles={['admin', 'hr']}>
+              <EditEmployee />
+            </ProtectedRoute>
+          } />
 
-            {/* Employee Management */}
-            <Route path="/employees" element={
-              <ProtectedRoute requiredRoles={['admin', 'hr']}>
-                <EmployeeList />
-              </ProtectedRoute>
-            } />
-            <Route path="/employees/add" element={
-              <ProtectedRoute requiredRoles={['admin', 'hr']}>
-                <AddEmployee />
-              </ProtectedRoute>
-            } />
-            <Route path="/employees/:id" element={<EmployeeProfile />} />
-            <Route path="/employees/:id/edit" element={
-              <ProtectedRoute requiredRoles={['admin', 'hr']}>
-                <EditEmployee />
-              </ProtectedRoute>
-            } />
+          {/* Clients */}
+          <Route path="/clients" element={
+            <ProtectedRoute requiredRoles={['admin', 'manager']}>
+              <ClientList />
+            </ProtectedRoute>
+          } />
+          <Route path="/clients/add" element={
+            <ProtectedRoute requiredRoles={['admin', 'manager']}>
+              <AddClient />
+            </ProtectedRoute>
+          } />
+          <Route path="/clients/assign" element={
+            <ProtectedRoute requiredRoles={['admin', 'manager']}>
+              <AssignClient />
+            </ProtectedRoute>
+          } />
 
-            {/* Clients */}
-            <Route path="/clients" element={
-              <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                <ClientList />
-              </ProtectedRoute>
-            } />
-            <Route path="/clients/add" element={
-              <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                <AddClient />
-              </ProtectedRoute>
-            } />
-            <Route path="/clients/assign" element={
-              <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                <AssignClient />
-              </ProtectedRoute>
-            } />
+          <Route path="/leads/dashboard" element={
+            <ProtectedRoute requiredRoles={['admin', 'manager']}>
+              <LeadDashboard />
+            </ProtectedRoute>
+          } />
 
-            <Route path="/leads/dashboard" element={
-              <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                <LeadDashboard />
-              </ProtectedRoute>
-            } />
+          {/* Tasks */}
+          <Route path="/tasks/create" element={
+            <ProtectedRoute requiredRoles={['admin', 'manager']}>
+              <CreateTask />
+            </ProtectedRoute>
+          } />
+          <Route path="/tasks/my-tasks" element={<MyTasks />} />
+          <Route path="/tasks/team" element={
+            <ProtectedRoute requiredRoles={['admin', 'manager']}>
+              <TeamTasks />
+            </ProtectedRoute>
+          } />
+          <Route path="/tasks/board" element={<TaskBoard />} />
 
-            {/* Tasks */}
-            <Route path="/tasks/create" element={
-              <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                <CreateTask />
-              </ProtectedRoute>
-            } />
-            <Route path="/tasks/my-tasks" element={<MyTasks />} />
-            <Route path="/tasks/team" element={
-              <ProtectedRoute requiredRoles={['admin', 'manager']}>
-                <TeamTasks />
-              </ProtectedRoute>
-            } />
-            <Route path="/tasks/board" element={<TaskBoard />} />
+          {/* Attendance */}
+          <Route path="/attendance/mark" element={<MarkAttendance />} />
+          <Route path="/attendance/history" element={<AttendanceTable />} />
 
-            {/* Attendance */}
-            <Route path="/attendance/mark" element={<MarkAttendance />} />
-            <Route path="/attendance/history" element={<AttendanceTable />} />
+          {/* Leave Management */}
+          <Route path="/leaves/apply" element={<ApplyLeave />} />
+          <Route path="/leaves/requests" element={
+            <ProtectedRoute requiredRoles={['admin', 'hr', 'manager']}>
+              <LeaveRequests />
+            </ProtectedRoute>
+          } />
+          <Route path="/leaves/history" element={<LeaveHistory />} />
 
-            {/* Leave Management */}
-            <Route path="/leaves/apply" element={<ApplyLeave />} />
-            <Route path="/leaves/requests" element={
-              <ProtectedRoute requiredRoles={['admin', 'hr', 'manager']}>
-                <LeaveRequests />
-              </ProtectedRoute>
-            } />
-            <Route path="/leaves/history" element={<LeaveHistory />} />
+          {/* Salary Management */}
+          <Route path="/salary/generate" element={
+            <ProtectedRoute requiredRoles={['admin', 'hr']}>
+              <GenerateSalary />
+            </ProtectedRoute>
+          } />
+          <Route path="/salary/list" element={
+            <ProtectedRoute requiredRoles={['admin', 'hr']}>
+              <SalaryList />
+            </ProtectedRoute>
+          } />
+          <Route path="/salary/payslip/:id" element={<PayslipDownload />} />
 
-            {/* Salary Management */}
-            <Route path="/salary/generate" element={
-              <ProtectedRoute requiredRoles={['admin', 'hr']}>
-                <GenerateSalary />
-              </ProtectedRoute>
-            } />
-            <Route path="/salary/list" element={
-              <ProtectedRoute requiredRoles={['admin', 'hr']}>
-                <SalaryList />
-              </ProtectedRoute>
-            } />
-            <Route path="/salary/payslip/:id" element={<PayslipDownload />} />
+          {/* Assets */}
+          <Route path="/assets/assign" element={
+            <ProtectedRoute requiredRoles={['admin', 'hr']}>
+              <AssignAsset />
+            </ProtectedRoute>
+          } />
+          <Route path="/assets/list" element={
+            <ProtectedRoute requiredRoles={['admin', 'hr']}>
+              <AssetList />
+            </ProtectedRoute>
+          } />
+          <Route path="/assets/my-assets" element={<EmployeeAssets />} />
 
-            {/* Assets */}
-            <Route path="/assets/assign" element={
-              <ProtectedRoute requiredRoles={['admin', 'hr']}>
-                <AssignAsset />
-              </ProtectedRoute>
-            } />
-            <Route path="/assets/list" element={
-              <ProtectedRoute requiredRoles={['admin', 'hr']}>
-                <AssetList />
-              </ProtectedRoute>
-            } />
-            <Route path="/assets/my-assets" element={<EmployeeAssets />} />
+          {/* Invoice Routes */}
+          <Route path="/invoices" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <InvoiceDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/list" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <InvoiceList />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/create" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <CreateInvoice />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/:id" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <InvoiceDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/:id/edit" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <EditInvoice />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/:id/send" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <SendInvoice />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/:id/payment" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <InvoicePayment />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/settings" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <InvoiceSettings />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/history" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <InvoiceHistory />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/overdue" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <OverdueInvoices />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/recurring" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <RecurringInvoices />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/recurring/:id" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <RecurringInvoiceDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/invoices/client/:clientId" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <ClientInvoices />
+            </ProtectedRoute>
+          } />
 
-            {/* Invoice Routes */}
-            <Route path="/invoices" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <InvoiceDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/list" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <InvoiceList />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/create" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <CreateInvoice />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/:id" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <InvoiceDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/:id/edit" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <EditInvoice />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/:id/send" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <SendInvoice />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/:id/payment" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <InvoicePayment />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/settings" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <InvoiceSettings />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/history" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <InvoiceHistory />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/overdue" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <OverdueInvoices />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/recurring" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <RecurringInvoices />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/recurring/:id" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <RecurringInvoiceDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="/invoices/client/:clientId" element={
-              <ProtectedRoute requiredRoles={['admin']}>
-                <ClientInvoices />
-              </ProtectedRoute>
-            } />
+          {/* Reports */}
+          <Route path="/reports/dashboard" element={
+            <ProtectedRoute requiredRoles={['admin', 'hr', 'manager']}>
+              <ReportsDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/reports/export" element={
+            <ProtectedRoute requiredRoles={['admin', 'hr', 'manager']}>
+              <ExportCSV />
+            </ProtectedRoute>
+          } />
+        </Route>
 
-            {/* Reports */}
-            <Route path="/reports/dashboard" element={
-              <ProtectedRoute requiredRoles={['admin', 'hr', 'manager']}>
-                <ReportsDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/reports/export" element={
-              <ProtectedRoute requiredRoles={['admin', 'hr', 'manager']}>
-                <ExportCSV />
-              </ProtectedRoute>
-            } />
-          </Route>
-
-          {/* 404 */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
-    </PermissionProvider>
+        {/* 404 */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }
 

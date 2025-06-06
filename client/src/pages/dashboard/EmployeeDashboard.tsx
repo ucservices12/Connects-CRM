@@ -1,9 +1,8 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckSquare, Calendar, FileText, Package, Clock, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { useAuth } from '../../contexts/AuthContext';
 import { format } from 'date-fns';
+import { useSelector } from 'react-redux';
 
 // Mock data
 const attendanceData = [
@@ -48,7 +47,7 @@ const announcements = [
 ];
 
 const EmployeeDashboard = () => {
-  const { user } = useAuth();
+  const user = useSelector((state) => state.auth.user);
   const today = new Date();
 
   // Priority badge color
@@ -290,8 +289,8 @@ const EmployeeDashboard = () => {
               <div key={task.id} className="flex items-start p-3 rounded-lg border border-neutral-200 hover:border-primary-200 hover:bg-neutral-50">
                 <div className="mr-3">
                   <div className={`p-2 rounded-md ${task.status === 'In Progress' ? 'bg-primary-100 text-primary-700' :
-                      task.status === 'Done' ? 'bg-success-100 text-success-700' :
-                        'bg-neutral-100 text-neutral-700'
+                    task.status === 'Done' ? 'bg-success-100 text-success-700' :
+                      'bg-neutral-100 text-neutral-700'
                     }`}>
                     <CheckSquare size={20} />
                   </div>

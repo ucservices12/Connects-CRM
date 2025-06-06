@@ -3,7 +3,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { User, Lock, Bell, Shield, Eye, EyeOff } from 'lucide-react';
 import { getRoleBadgeClass } from '../../components/layout/Navbar';
 import { updatePassword } from '../../machine/auth';
-import toast from 'react-hot-toast';
+import { useSelector } from 'react-redux';
+import { toast } from '../../components/common/Toaster';
 
 // --- Reusable Components ---
 type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
@@ -292,6 +293,7 @@ const SecurityTab: React.FC<PropSecurityData> = ({ securityData, setSecurityData
       const data = await updatePassword(securityData);
       if (data.success) {
         console.log("Password updated successfully!");
+        toast.success("Update Your Password")
         setSecurityData({ currentPassword: '', newPassword: '', confirmPassword: '' });
         setError(null);
       }
@@ -469,7 +471,7 @@ const NotificationsTab: React.FC<PropsNotificationData> = ({ notificationData, s
 
 // --- Main UserProfile Component ---
 const UserProfile = () => {
-  const { user } = useAuth();
+  const user = useSelector((state) => state.auth.user);
   const [activeTab, setActiveTab] = useState('profile');
 
   // Separate form states
@@ -534,15 +536,6 @@ const UserProfile = () => {
       }));
     }
   }, [user]);
-
-  // const handlePasswordSave = (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   try {
-
-  //   } catch (error) {
-  //     console.error("Error saving password:", error);
-  //   }
-  // }
 
   return (
     <div className="animate-fade-in">

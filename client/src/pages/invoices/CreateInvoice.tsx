@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Save, ArrowLeft, Send, UserPlus } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, Send, UserPlus, Settings } from 'lucide-react';
 import DatePicker from '../../components/common/DatePicker';
 import ClientSelector from '../../components/invoices/ClientSelector';
 import { createInvoice } from '../../machine/invoice';
-import { useAuth } from '../../contexts/AuthContext';
 import { toast } from '../../components/common/Toaster';
 import { TextareaAutosize } from '@mui/material';
+import { useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
+import { AppDispatch, RootState } from '../../redux/store';
+import { fetchInvoiceSettings } from '../../redux/slices/invoiceSlice';
 
 // Helpers
 const defaultAddress = { street: '', city: '', state: '', zipCode: '', country: '' };
@@ -20,8 +23,37 @@ const defaultItem = () => ({
 const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
 
 const CreateInvoice = () => {
+    const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
-    const { organization, user } = useAuth();
+    const { organization, user } = useSelector((state: any) => state.auth);
+    const { invoiceSettings } = useSelector((state: RootState) => state.invoice);
+
+    useEffect(() => {
+        if (organization?._id) {
+            dispatch(fetchInvoiceSettings(organization._id));
+        }
+    }, [organization?._id, dispatch]);
+
+    const [showDropdown, setShowDropdown] = useState<string | null>(null);
+
+    // Helper to filter items
+    const filteredOptions = (term) => {
+        return (invoiceSettings?.invoice?.invoiceTypes || []).filter(type =>
+            type.toLowerCase().includes(term.toLowerCase())
+        );
+    };
+
+    useEffect(() => {
+        if (invoiceSettings?.invoice?.prefix) {
+            const generatedNo = `${invoiceSettings.invoice.prefix}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
+            setInvoice((prevInvoice) => ({
+                ...prevInvoice,
+                invoiceNo: generatedNo,
+                notes: invoiceSettings.invoice.notes || '',
+                terms: invoiceSettings.invoice.terms || '',
+            }));
+        }
+    }, [invoiceSettings]);
 
     // State
     const [clients, setClients] = useState([]);
@@ -29,16 +61,19 @@ const CreateInvoice = () => {
     const [newClient, setNewClient] = useState({ companyName: '', name: '', address: { ...defaultAddress }, email: '', phone: '' });
     const [invoice, setInvoice] = useState({
         clientId: '',
-        invoiceNo: `INV-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+        invoiceNo: '',
         issueDate: new Date(),
         dueDate: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d; })(),
         items: [defaultItem()],
         notes: '',
         sGST: 0,
         discount: 0,
-        status: 'Draft',
+        status: '',
         terms: '',
         paidAmount: 0,
+        settings: {
+            invoiceSettings
+        }
     });
 
     // Error state
@@ -147,7 +182,7 @@ const CreateInvoice = () => {
     };
 
     // Submit handler
-    const handleSubmit = async (e, isDraft = true) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         const selectedClient = clients.find(c => c.id === invoice.clientId);
 
@@ -176,13 +211,42 @@ const CreateInvoice = () => {
             tax: invoice.sGST + cGST,
             discount: invoice.discount,
             grandTotal,
-            status: isDraft ? 'Draft' : invoice.status,
+            status: invoice.status,
             dueDate: invoice.dueDate,
             notes: invoice.notes,
             terms: invoice.terms,
             sentAt: '',
             paidAt: '',
             paidAmount: invoice.paidAmount,
+            settings: {
+                company: {
+                    name: invoiceSettings?.company?.name || '',
+                    address: invoiceSettings?.company?.address || '',
+                    city: invoiceSettings?.company?.city || '',
+                    state: invoiceSettings?.company?.state || '',
+                    zip: invoiceSettings?.company?.zip || '',
+                    phone: invoiceSettings?.company?.phone || '',
+                    email: invoiceSettings?.company?.email || '',
+                    website: invoiceSettings?.company?.website || '',
+                    logoUrl: invoiceSettings?.company?.logoUrl || '',
+                    gst: invoiceSettings?.company?.gst || '',
+                    tan: invoiceSettings?.company?.tan || '',
+                },
+                invoice: {
+                    prefix: invoiceSettings?.invoice?.prefix || '',
+                    nextNumber: invoiceSettings?.invoice?.nextNumber || '',
+                    terms: invoiceSettings?.invoice?.terms || '',
+                    notes: invoiceSettings?.invoice?.notes || '',
+                    defaultTax: invoiceSettings?.invoice?.defaultTax || 0,
+                },
+                payment: {
+                    bankName: invoiceSettings?.payment?.bankName || '',
+                    accountName: invoiceSettings?.payment?.accountName || '',
+                    accountNumber: invoiceSettings?.payment?.accountNumber || '',
+                    ifscCode: invoiceSettings?.payment?.ifscCode || '',
+                    upi: invoiceSettings?.payment?.upi || '',
+                },
+            },
             createdBy: user?._id || '',
         };
 
@@ -194,6 +258,8 @@ const CreateInvoice = () => {
             setErrors({ submit: 'Failed to create invoice. Please try again.' });
         }
     };
+
+    console.log("CreateInvoiceData =>", invoice);
 
     // Render
     return (
@@ -335,11 +401,14 @@ const CreateInvoice = () => {
                 <div className="form-group max-w-xs">
                     <label className="form-label">Status</label>
                     <select className="form-input" value={invoice.status} onChange={e => handleField('status', e.target.value)}>
-                        <option value="Draft">Draft</option>
-                        <option value="Sent">Sent</option>
-                        <option value="Paid">Paid</option>
-                        <option value="Overdue">Overdue</option>
+                        <option value="Pendding">Pending Payment</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Hold">On Hold</option>
+                        <option value="Completed">Completed</option>
                         <option value="Cancelled">Cancelled</option>
+                        <option value="Refunded">Refunded</option>
+                        <option value="Failed">Failed</option>
+                        <option value="Draft">Draft</option>
                     </select>
                 </div>
 
@@ -352,7 +421,7 @@ const CreateInvoice = () => {
                     <div className="flex flex-col gap-4">
                         <div className="hidden sm:grid grid-cols-12 gap-2 px-2 text-sm text-neutral-500">
                             <div className="col-span-1">SR NO</div>
-                            <div className="col-span-4">Description</div>
+                            <div className="col-span-4">Product</div>
                             <div className="col-span-2">Quantity</div>
                             <div className="col-span-2">Rate</div>
                             <div className="col-span-2 text-right">Amount</div>
@@ -367,16 +436,41 @@ const CreateInvoice = () => {
                                     <span className="sm:hidden text-xs text-neutral-500 mr-2">SR NO</span>
                                     <span>{index + 1}</span>
                                 </div>
-                                <div className="sm:col-span-4 col-span-5 w-full">
+                                <div className="sm:col-span-4 col-span-5 w-full relative">
+                                    <label className="sr-only" htmlFor={`description-${item.id}`}>Product</label>
                                     <input
+                                        id={`description-${item.id}`}
                                         type="text"
                                         className="form-input w-full capitalize"
-                                        placeholder="Item description"
+                                        placeholder="Add or Select Product"
                                         value={item.description}
-                                        onChange={e => handleItem(item.id, 'description', e.target.value)}
-                                        required
+                                        onChange={(e) => {
+                                            handleItem(item.id, 'description', e.target.value);
+                                            setShowDropdown(item.id);
+                                        }}
+                                        onFocus={() => setShowDropdown(item.id)}
+                                        onBlur={() => setTimeout(() => setShowDropdown(null), 150)}
+                                        autoComplete="off"
                                     />
+
+                                    {showDropdown === item.id && filteredOptions(item.description).length > 0 && (
+                                        <ul className="absolute z-50 w-full bg-white border border-neutral-200 rounded shadow-md mt-1 max-h-48 overflow-y-auto">
+                                            {filteredOptions(item.description).map((option, idx) => (
+                                                <li
+                                                    key={idx}
+                                                    className="px-4 py-2 hover:bg-neutral-100 cursor-pointer capitalize"
+                                                    onMouseDown={() => {
+                                                        handleItem(item.id, 'description', option);
+                                                        setShowDropdown(null);
+                                                    }}
+                                                >
+                                                    {option}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
                                 </div>
+
                                 <div className="sm:col-span-2 col-span-2 w-full flex sm:block justify-between items-center">
                                     <span className="sm:hidden text-xs text-neutral-500 mr-2">Qty</span>
                                     <input

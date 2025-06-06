@@ -26,7 +26,11 @@ const InvoiceSettingSchema = new mongoose.Schema({
             nextNumber: { type: String, default: '' },
             terms: { type: String, default: '' },
             notes: { type: String, default: '' },
-            defaultTax: { type: Number, default: 0 }
+            defaultTax: { type: Number, default: 0 },
+            invoiceTypes: {
+                type: [String],
+                default: []
+            }
         },
         payment: {
             bankName: { type: String, default: '' },

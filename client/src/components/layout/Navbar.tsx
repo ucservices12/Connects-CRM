@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Menu, Bell, User, LogOut } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { logout } from '../../redux/slices/authSlice';
 
 export const getRoleBadgeClass = (role: string) => {
   switch (role) {
@@ -13,7 +14,9 @@ export const getRoleBadgeClass = (role: string) => {
 };
 
 const Navbar = ({ openSidebar }: { openSidebar: () => void }) => {
-  const { user, logout } = useAuth();
+  const { user } = useSelector((state: any) => state.auth);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +36,7 @@ const Navbar = ({ openSidebar }: { openSidebar: () => void }) => {
       </button>
 
       {/* Search (hidden on mobile) */}
-      <div className="hidden md:flex flex-1 max-w-md">
+      <div className="hidden md:flex flex-1 max-w-md relative">
         <input
           type="text"
           placeholder="Search..."
@@ -81,10 +84,14 @@ const Navbar = ({ openSidebar }: { openSidebar: () => void }) => {
                 </div>
               </div>
               <Link to="/profile" className="flex items-center px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100">
-                <User size={16} className="mr-2" />Profile
+                <User size={16} className="mr-2" /> Profile
               </Link>
               <button
-                onClick={() => { setOpen(false); logout(); }}
+                onClick={() => {
+                  setOpen(false);
+                  dispatch(logout());
+                  navigate('/login');
+                }}
                 className="w-full text-left px-4 py-2 text-sm text-danger-700 hover:bg-neutral-100 flex items-center"
               >
                 <LogOut size={16} className="mr-2" /> Sign out

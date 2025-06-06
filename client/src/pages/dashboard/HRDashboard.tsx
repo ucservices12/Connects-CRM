@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Calendar, FileText, Briefcase, Clock, ChevronRight, Plus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { useAuth } from '../../contexts/AuthContext';
 import { format } from 'date-fns';
+import { useSelector } from 'react-redux';
 
 // Mock data
 const attendanceData = [
@@ -31,10 +31,10 @@ const leaveRequests = [
 ];
 
 const HRDashboard = () => {
-  const { user } = useAuth();
+  const user = useSelector((state) => state.auth.user);
   const [timeRange, setTimeRange] = useState('week');
   const today = new Date();
-  
+
   return (
     <div className="animate-fade-in">
       {/* Header */}
@@ -62,7 +62,7 @@ const HRDashboard = () => {
           {format(today, 'EEEE, MMMM d, yyyy')}
         </div>
       </div>
-      
+
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="card">
@@ -82,7 +82,7 @@ const HRDashboard = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="card">
           <div className="flex items-start">
             <div className="p-3 rounded-md bg-accent-100 text-accent-700">
@@ -100,7 +100,7 @@ const HRDashboard = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="card">
           <div className="flex items-start">
             <div className="p-3 rounded-md bg-success-100 text-success-700">
@@ -116,7 +116,7 @@ const HRDashboard = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="card">
           <div className="flex items-start">
             <div className="p-3 rounded-md bg-warning-100 text-warning-700">
@@ -135,7 +135,7 @@ const HRDashboard = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="card lg:col-span-2">
@@ -170,7 +170,7 @@ const HRDashboard = () => {
             </ResponsiveContainer>
           </div>
         </div>
-        
+
         <div className="card">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-medium text-neutral-900">Department Distribution</h3>
@@ -200,7 +200,7 @@ const HRDashboard = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Quick Access */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="card bg-primary-50 border border-primary-100">
@@ -216,7 +216,7 @@ const HRDashboard = () => {
             </Link>
           </div>
         </div>
-        
+
         <div className="card bg-accent-50 border border-accent-100">
           <h3 className="text-lg font-medium text-accent-900 mb-3">Leave Management</h3>
           <p className="text-sm text-accent-700 mb-4">Review and process leave requests.</p>
@@ -229,7 +229,7 @@ const HRDashboard = () => {
             </Link>
           </div>
         </div>
-        
+
         <div className="card bg-success-50 border border-success-100">
           <h3 className="text-lg font-medium text-success-900 mb-3">Salary Management</h3>
           <p className="text-sm text-success-700 mb-4">Process and view salary records.</p>
@@ -243,7 +243,7 @@ const HRDashboard = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Pending Leave Requests */}
       <div className="card mb-6">
         <div className="flex justify-between items-center mb-4">
@@ -253,7 +253,7 @@ const HRDashboard = () => {
             <ChevronRight size={16} />
           </Link>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-neutral-200">
             <thead>
@@ -302,13 +302,13 @@ const HRDashboard = () => {
           </table>
         </div>
       </div>
-      
+
       {/* Upcoming Events */}
       <div className="card">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium text-neutral-900">Upcoming Events</h3>
         </div>
-        
+
         <div className="space-y-3">
           <div className="flex items-start p-3 rounded-lg border border-primary-100 bg-primary-50">
             <div className="p-2 rounded-md bg-primary-100 text-primary-700">
@@ -319,7 +319,7 @@ const HRDashboard = () => {
               <p className="text-xs text-neutral-500">Tomorrow, 10:00 AM - 11:30 AM</p>
             </div>
           </div>
-          
+
           <div className="flex items-start p-3 rounded-lg border border-accent-100 bg-accent-50">
             <div className="p-2 rounded-md bg-accent-100 text-accent-700">
               <Users size={20} />
@@ -329,7 +329,7 @@ const HRDashboard = () => {
               <p className="text-xs text-neutral-500">Oct 25, 2023, 9:00 AM - 11:00 AM</p>
             </div>
           </div>
-          
+
           <div className="flex items-start p-3 rounded-lg border border-success-100 bg-success-50">
             <div className="p-2 rounded-md bg-success-100 text-success-700">
               <Briefcase size={20} />

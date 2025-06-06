@@ -2,10 +2,10 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   X, Users, BarChart3, Building2, CheckSquare, CalendarClock,
   FileText, Package, ClipboardList, Briefcase, PieChart,
-  BellRing, Receipt, Clock, AlertTriangle, Settings, History,
+  Receipt, AlertTriangle, Settings, History,
   RefreshCw
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useSelector } from 'react-redux';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -13,7 +13,7 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ isOpen, closeSidebar }: SidebarProps) => {
-  const { user, logout } = useAuth();
+  const user = useSelector((state) => state.auth.user);
   const location = useLocation();
 
   // Define sidebar links based on user role

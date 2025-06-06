@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Shield, Check, X } from 'lucide-react';
-import { usePermissions } from '../../contexts/PermissionContext';
+import { Shield } from 'lucide-react';
+import { usePermissions } from '../../hooks/usePermissions';
 
 const Permissions = () => {
-    const { permissions, togglePermission } = usePermissions();
+    const { permissions, togglePermission } = usePermissions(); // from Redux
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedRole, setSelectedRole] = useState('admin');
 
@@ -31,8 +31,8 @@ const Permissions = () => {
                                 key={role}
                                 onClick={() => setSelectedRole(role)}
                                 className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${selectedRole === role
-                                    ? 'bg-primary-100 text-primary-800 border-2 border-primary-200'
-                                    : 'bg-neutral-50 text-neutral-700 border-2 border-neutral-200 hover:bg-neutral-200'
+                                        ? 'bg-primary-100 text-primary-800 border-2 border-primary-200'
+                                        : 'bg-neutral-50 text-neutral-700 border-2 border-neutral-200 hover:bg-neutral-200'
                                     }`}
                             >
                                 {role.charAt(0).toUpperCase() + role.slice(1)}
@@ -48,7 +48,7 @@ const Permissions = () => {
                         placeholder="Search permissions..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="form-input"
+                        className="form-input w-full border border-neutral-300 rounded-md px-4 py-2"
                     />
                 </div>
 
