@@ -94,23 +94,23 @@ exports.createInvoice = async (req, res, next) => {
             });
         }
 
-        // Calculate totals and validate
-        if (invoiceData.items && invoiceData.items.length > 0) {
-            let totalAmount = 0;
+        // // Calculate totals and validate
+        // if (invoiceData.items && invoiceData.items.length > 0) {
+        //     let totalAmount = 0;
 
-            // Calculate amount for each item and total
-            invoiceData.items.forEach(item => {
-                item.amount = item.quantity * item.rate;
-                totalAmount += item.amount;
-            });
+        //     // Calculate amount for each item and total
+        //     invoiceData.items.forEach(item => {
+        //         item.amount = item.quantity * item.rate;
+        //         totalAmount += item.amount;
+        //     });
 
-            invoiceData.totalAmount = totalAmount;
+        //     invoiceData.totalAmount = totalAmount;
 
-            // Calculate grand total with tax
-            const taxAmount = totalAmount * (invoiceData.tax / 100 || 0);
-            const discountAmount = totalAmount * (invoiceData.discount / 100 || 0);
-            invoiceData.grandTotal = totalAmount + taxAmount - discountAmount;
-        }
+        //     // Calculate grand total with tax
+        //     const taxAmount = totalAmount * (invoiceData.tax / 100 || 0);
+        //     const discountAmount = totalAmount * (invoiceData.discount / 100 || 0);
+        //     invoiceData.grandTotal = totalAmount + taxAmount - discountAmount;
+        // }
 
         const invoice = await Invoice.create(invoiceData);
 
@@ -152,24 +152,24 @@ exports.updateInvoice = async (req, res, next) => {
             });
         }
 
-        // Recalculate totals if items are updated
-        if (req.body.items && req.body.items.length > 0) {
-            let totalAmount = 0;
+        // // Recalculate totals if items are updated
+        // if (req.body.items && req.body.items.length > 0) {
+        //     let totalAmount = 0;
 
-            req.body.items.forEach(item => {
-                item.amount = item.quantity * item.rate;
-                totalAmount += item.amount;
-            });
+        //     req.body.items.forEach(item => {
+        //         item.amount = item.quantity * item.rate;
+        //         totalAmount += item.amount;
+        //     });
 
-            req.body.totalAmount = totalAmount;
+        //     req.body.totalAmount = totalAmount;
 
-            const tax = req.body.tax || 0;
-            const discount = req.body.discount || 0;
+        //     const tax = req.body.tax || 0;
+        //     const discount = req.body.discount || 0;
 
-            const taxAmount = totalAmount * (tax / 100);
-            const discountAmount = totalAmount * (discount / 100);
-            req.body.grandTotal = totalAmount + taxAmount - discountAmount;
-        }
+        //     const taxAmount = totalAmount * (tax / 100);
+        //     const discountAmount = totalAmount * (discount / 100);
+        //     req.body.grandTotal = totalAmount + taxAmount - discountAmount;
+        // }
 
         // If invoice is Paid and hasn't been edited yet, mark it as edited
         if (invoice.status === 'Completed' && !invoice.wasPaidInvoiceEdited) {

@@ -3,7 +3,10 @@ import {
   X, Users, BarChart3, Building2, CheckSquare, CalendarClock,
   FileText, Package, ClipboardList, Briefcase, PieChart,
   Receipt, AlertTriangle, Settings, History,
-  RefreshCw
+  RefreshCw,
+  Target,
+  Activity,
+  LayoutDashboard
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 
@@ -75,16 +78,46 @@ const Sidebar = ({ isOpen, closeSidebar }: SidebarProps) => {
         section: 'Leads',
         items: [
           {
-            name: 'Dashboard',
-            path: '/leads/dashboard',
+            name: 'Leads Board',
+            path: '/leads/admin-board',
             icon: <Building2 size={20} />,
-            allowedRoles: ['admin', 'manager', 'employee'],
+            allowedRoles: ['admin'],
           },
           {
-            name: 'Calls',
-            path: '/leads/Calls',
-            icon: <Building2 size={20} />,
-            allowedRoles: ['admin', 'manager', 'employee'],
+            name: 'All Leads',
+            path: 'leads/total-leads',
+            icon: <ClipboardList size={20} />,
+            allowedRoles: ['admin'],
+          },
+          {
+            name: 'Analytics & Reports',
+            path: 'leads/analytics',
+            icon: <ClipboardList size={20} />,
+            allowedRoles: ['admin'],
+          },
+          {
+            name: 'Dashboard',
+            path: '/leads/employee-board',
+            icon: <LayoutDashboard size={20} />,
+            allowedRoles: ['employee'],
+          },
+          {
+            name: 'My Leads',
+            path: '/leads/myleads',
+            icon: <ClipboardList size={20} />,
+            allowedRoles: ['employee'],
+          },
+          {
+            name: 'Target',
+            path: '/leads/my-target',
+            icon: <Target size={20} />,
+            allowedRoles: ['employee'],
+          },
+          {
+            name: 'My Activities',
+            path: '/leads/activities',
+            icon: <Activity size={20} />,
+            allowedRoles: ['employee'],
           },
         ],
       },

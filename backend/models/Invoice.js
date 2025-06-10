@@ -10,7 +10,6 @@ const InvoiceSchema = new mongoose.Schema({
             message: 'Invalid organizationId',
         }
     },
-
     client: {
         clientId: {
             type: String,
@@ -44,14 +43,12 @@ const InvoiceSchema = new mongoose.Schema({
             country: { type: String, default: '' }
         }
     },
-
     invoiceNo: {
         type: String,
         required: [true, 'Please add an invoice number'],
         unique: true,
         trim: true
     },
-
     items: [
         {
             description: {
@@ -74,11 +71,6 @@ const InvoiceSchema = new mongoose.Schema({
             }
         }
     ],
-
-    totalAmount: {
-        type: Number,
-        required: [true, 'Please add a total amount']
-    },
     sGST: {
         type: Number,
         default: 0
@@ -88,6 +80,10 @@ const InvoiceSchema = new mongoose.Schema({
         default: 0
     },
     tax: {
+        type: Number,
+        default: 0
+    },
+    taxAmount: {
         type: Number,
         default: 0
     },
@@ -105,34 +101,47 @@ const InvoiceSchema = new mongoose.Schema({
         enum: ['Pendding', 'Processing', 'Hold', 'Completed', 'Cancelled', 'Refunded', 'Failed', 'Draft'],
         default: 'Draft'
     },
-
     dueDate: {
         type: Date
     },
-
     notes: {
         type: String,
         default: ''
     },
-
     terms: {
         type: String,
         default: ''
     },
-
     sentAt: {
         type: Date
     },
-
+    totalAmount: {
+        type: Number,
+        required: [true, 'Please add a total']
+    },
+    sgstAmount: {
+        type: Number,
+        default: 0
+    },
+    cgstAmount: {
+        type: Number,
+        default: 0
+    },
+    discountAmount: {
+        type: Number,
+        default: 0
+    },
+    balanceDue: {
+        type: Number,
+        required: [true, 'Please add a balance due amount']
+    },
     paidAt: {
         type: Date
     },
-
     paidAmount: {
         type: Number,
         default: 0
     },
-
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -142,7 +151,6 @@ const InvoiceSchema = new mongoose.Schema({
             message: 'Invalid createdBy'
         }
     },
-
     settings: {
         company: {
             name: { type: String, default: '' },
@@ -172,17 +180,14 @@ const InvoiceSchema = new mongoose.Schema({
             upi: { type: String, default: '' }
         },
     },
-
     createdAt: {
         type: Date,
         default: Date.now
     },
-
     updatedAt: {
         type: Date,
         default: Date.now
     },
-
     wasPaidInvoiceEdited: {
         type: Boolean,
         default: false

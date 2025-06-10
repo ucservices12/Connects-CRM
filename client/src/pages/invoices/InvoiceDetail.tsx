@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import {
-    ArrowLeft, Edit, Printer, Download
-} from 'lucide-react';
+import { ArrowLeft, Edit, Printer, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { getInvoiceById } from '../../machine/invoice';
@@ -24,9 +22,6 @@ const printStyles = `
 }
 `;
 
-const formatRupees = (amount: number) =>
-    `₹${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-
 const InvoiceDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -41,14 +36,30 @@ const InvoiceDetail = () => {
     }, []);
 
     useEffect(() => {
-        const FetchInvoiceDetails = async () => {
+        const fetchInvoiceDetails = async () => {
             const response = await getInvoiceById(id);
             if (response.data) {
-                setInvoiceDetails(response?.data)
+                setInvoiceDetails(response?.data);
             }
-        }
-        FetchInvoiceDetails()
-    }, [id])
+        };
+        fetchInvoiceDetails();
+    }, [id]);
+
+    const total = invoiceDetails?.totalAmount + invoiceDetails?.taxAmount - invoiceDetails?.discountAmount
+    const remainingAmount = total - invoiceDetails?.paidAmount
+
+
+    // Utility function to format amount in INR
+    const formatRupees = (amount: number) =>
+        `₹${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+    // Utility function to format address
+    const formatAddress = (address: any) => {
+        if (!address) return '';
+        if (typeof address === 'string') return address;
+        return [address.street, address.city, address.state, address.zipCode, address.country]
+            .filter(Boolean).join(', ');
+    };
 
     const handleDownloadPDF = async () => {
         if (!invoiceRef.current) return;
@@ -77,22 +88,7 @@ const InvoiceDetail = () => {
         setTimeout(() => { document.title = oldTitle; }, 1000);
     };
 
-    // Dynamic calculations
-    const subtotal = invoiceDetails?.items?.reduce((sum: number, item: any) => sum + (item.quantity * item.rate), 0);
-    const sgstAmount = (subtotal * (invoiceDetails?.sGST || 0)) / 100;
-    const cgstAmount = (subtotal * (invoiceDetails?.cGST || 0)) / 100;
-    const taxAmount = sgstAmount + cgstAmount;
-    const discountAmount = (subtotal * (invoiceDetails?.discount || 0)) / 100;
-    const total = subtotal + taxAmount - discountAmount;
-    const paid = invoiceDetails?.paidAmount || 0;
-    const balanceDue = total - paid;
-
-    const formatAddress = (address: any) => {
-        if (!address) return '';
-        if (typeof address === 'string') return address;
-        return [address.street, address.city, address.state, address.zipCode, address.country]
-            .filter(Boolean).join(', ');
-    };
+    console.log("invoiceDetails =>", invoiceDetails);
 
     return (
         <div className="font-sans bg-gray-50 min-h-screen py-8">
@@ -177,7 +173,7 @@ const InvoiceDetail = () => {
                             <div className="text-xs font-bold text-gray-700">Invoice Number</div>
                             <div className="text-gray-900 break-words">{invoiceDetails?.invoiceNo}</div>
                             <div className="text-xs font-bold text-gray-700 mt-2">Amount Due</div>
-                            <div className="text-lg font-bold text-md text-green-500">{formatRupees(balanceDue)}</div>
+                            <div className="text-lg font-bold text-md text-green-500">{formatRupees(remainingAmount)}</div>
                         </div>
                     </div>
                 </div>
@@ -196,7 +192,7 @@ const InvoiceDetail = () => {
                         </thead>
                         <tbody>
                             {invoiceDetails?.items.map((item: any, idx: number) => (
-                                <React.Fragment key={item.id}>
+                                <React.Fragment key={idx}>
                                     <tr className="border-b border-gray-200">
                                         <td className="py-1.5 text-xs text-gray-500">{idx + 1}</td>
                                         <td className="py-1.5 text-xs font-semibold">{item?.description}</td>
@@ -210,28 +206,28 @@ const InvoiceDetail = () => {
                     </table>
                 </div>
 
-                {/* Totals */}
+                {/* Invoice Totals */}
                 <div className="flex flex-col items-end mt-3">
                     <div className="w-full md:w-1/2 text-xs">
                         <div className="flex justify-between py-1">
                             <span className="text-gray-700">Subtotal</span>
-                            <span className="font-semibold">{formatRupees(subtotal)}</span>
+                            <span className="font-semibold">{formatRupees(invoiceDetails?.totalAmount)}</span>
                         </div>
                         <div className="flex justify-between py-1">
                             <span className="text-gray-700">SGST ({invoiceDetails?.sGST}%)</span>
-                            <span className="font-semibold">{formatRupees(sgstAmount)}</span>
+                            <span className="font-semibold">{formatRupees(invoiceDetails?.sgstAmount)}</span>
                         </div>
                         <div className="flex justify-between py-1">
                             <span className="text-gray-700">CGST ({invoiceDetails?.cGST}%)</span>
-                            <span className="font-semibold">{formatRupees(cgstAmount)}</span>
+                            <span className="font-semibold">{formatRupees(invoiceDetails?.cgstAmount)}</span>
                         </div>
                         <div className="flex justify-between py-1">
                             <span className="text-gray-700">GST Tax ({invoiceDetails?.tax}%)</span>
-                            <span className="font-semibold">{formatRupees(taxAmount)}</span>
+                            <span className="font-semibold">+{formatRupees(invoiceDetails?.taxAmount)}</span>
                         </div>
                         <div className="flex justify-between py-1">
                             <span className="text-gray-700">Discount ({invoiceDetails?.discount}%)</span>
-                            <span className="font-semibold text-green-700">-{formatRupees(discountAmount)}</span>
+                            <span className="font-semibold text-green-700">-{formatRupees(invoiceDetails?.discountAmount)}</span>
                         </div>
                         <div className="flex justify-between py-2 font-bold border-t border-gray-200 mt-2 text-md">
                             <span>Total</span>
@@ -243,7 +239,7 @@ const InvoiceDetail = () => {
                         </div>
                         <div className="flex justify-between pt-1 font-bold text-indigo-700 text-md">
                             <span>Balance Due</span>
-                            <span>{formatRupees(balanceDue)}</span>
+                            <span>{formatRupees(invoiceDetails?.balanceDue)}</span>
                         </div>
                     </div>
                 </div>

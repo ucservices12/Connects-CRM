@@ -66,7 +66,7 @@ const CreateInvoice = () => {
         dueDate: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d; })(),
         items: [defaultItem()],
         notes: '',
-        sGST: 0,
+        sGST: 9,
         discount: 0,
         status: '',
         terms: '',
@@ -80,17 +80,30 @@ const CreateInvoice = () => {
     const [errors, setErrors] = useState({});
     const [clientAddError, setClientAddError] = useState('');
 
-    // Calculations
-    const cGST = invoice.sGST;
-    const subtotal = invoice.items.reduce((sum, item) => sum + item.quantity * item.rate, 0);
-    const sgstAmount = (subtotal * invoice.sGST) / 100;
-    const cgstAmount = (subtotal * cGST) / 100;
-    const taxAmount = sgstAmount + cgstAmount;
-    const discountAmount = (subtotal * invoice.discount) / 100;
-    const grandTotal = subtotal + taxAmount - discountAmount;
-    const paidAmount = invoice.paidAmount || 0;
-    const balanceDue = Math.max(grandTotal - paidAmount, 0);
-    const formatRupees = amount => `₹${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    const toTwoDecimal = (num) => Number(num.toFixed(2));
+
+    const grandTotal = toTwoDecimal(Number(invoice.items.reduce((sum, item) => sum + item.quantity * item.rate, 0)) || 0);
+    const sGST = toTwoDecimal(Number(invoice.sGST) || 0);
+    const cGST = sGST;
+    const discount = toTwoDecimal(Number(invoice.discount) || 0);
+    const paidAmount = toTwoDecimal(Number(invoice.paidAmount) || 0);
+
+    // Calculate effective multiplier
+    const effectiveMultiplier = 1 + ((sGST + cGST - discount) / 100);
+
+    // Reverse calculate subtotal
+    let subtotal = toTwoDecimal(grandTotal / effectiveMultiplier);
+
+    // Now forward calculate the rest
+    const sgstAmount = toTwoDecimal((subtotal * sGST) / 100);
+    const cgstAmount = toTwoDecimal((subtotal * cGST) / 100);
+    const discountAmount = toTwoDecimal((subtotal * discount) / 100);
+    const taxAmount = toTwoDecimal(sgstAmount + cgstAmount);
+
+    // Use the actual grandTotal as it was input
+    const balanceDue = toTwoDecimal(Math.max(grandTotal - paidAmount, 0));
+
+    const formatRupees = amount => `₹${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
     // Handlers
     const handleField = (field, value) => setInvoice(inv => ({ ...inv, [field]: value ?? 0 }));
@@ -181,6 +194,10 @@ const CreateInvoice = () => {
         return Object.keys(newErrors).length === 0;
     };
 
+    const handleIncludingGst = () => {
+
+    }
+
     // Submit handler
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -203,21 +220,26 @@ const CreateInvoice = () => {
                 description: item.description,
                 quantity: item.quantity,
                 rate: item.rate,
-                amount: item.quantity * item.rate,
+                amount: toTwoDecimal(item.quantity * item.rate),
             })),
             totalAmount: subtotal,
-            sGST: invoice.sGST,
-            cGST,
-            tax: invoice.sGST + cGST,
-            discount: invoice.discount,
-            grandTotal,
+            sGST: sGST,
+            cGST: cGST,
+            sgstAmount: sgstAmount,
+            cgstAmount: cgstAmount,
+            taxAmount: taxAmount,
+            tax: sGST + cGST,
+            discount: discount,
+            discountAmount: discountAmount,
+            grandTotal: grandTotal,
+            balanceDue: balanceDue,
             status: invoice.status,
             dueDate: invoice.dueDate,
             notes: invoice.notes,
             terms: invoice.terms,
             sentAt: '',
             paidAt: '',
-            paidAmount: invoice.paidAmount,
+            paidAmount: paidAmount,
             settings: {
                 company: {
                     name: invoiceSettings?.company?.name || '',
@@ -471,6 +493,7 @@ const CreateInvoice = () => {
                                     )}
                                 </div>
 
+                                {/* Quantity */}
                                 <div className="sm:col-span-2 col-span-2 w-full flex sm:block justify-between items-center">
                                     <span className="sm:hidden text-xs text-neutral-500 mr-2">Qty</span>
                                     <input
@@ -478,10 +501,12 @@ const CreateInvoice = () => {
                                         min="1"
                                         className="form-input w-full"
                                         value={item.quantity}
-                                        onChange={e => handleItem(item.id, 'quantity', e.target.value)}
+                                        onChange={e => handleItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
                                         required
                                     />
                                 </div>
+
+                                {/* Rate */}
                                 <div className="sm:col-span-2 col-span-2 w-full flex sm:block justify-between items-center">
                                     <span className="sm:hidden text-xs text-neutral-500 mr-2">Rate</span>
                                     <div className="relative w-full">
@@ -489,14 +514,14 @@ const CreateInvoice = () => {
                                         <input
                                             type="number"
                                             min="0"
-                                            step="0.01"
                                             className="form-input pl-7 w-full"
                                             value={item.rate}
-                                            onChange={e => handleItem(item.id, 'rate', e.target.value)}
+                                            onChange={e => handleItem(item.id, 'rate', parseInt(e.target.value))}
                                             required
                                         />
                                     </div>
                                 </div>
+
                                 <div className="sm:col-span-2 col-span-2 w-full flex sm:block justify-between items-center text-right">
                                     <span className="sm:hidden text-xs text-neutral-500 mr-2">Amount</span>
                                     <span className="block w-full">{formatRupees(item.quantity * item.rate)}</span>
@@ -563,6 +588,9 @@ const CreateInvoice = () => {
                         </div>
                     </div>
                     <div className="bg-neutral-50 p-4 rounded-lg">
+                        <div className='flex justify-end mb-3 '>
+                            <button onClick={handleIncludingGst} className="btn-primary py-1 text-xs">Including GST</button>
+                        </div>
                         <div className="flex justify-between py-2 border-b mb-3 border-red-600">
                             <span>Subtotal:</span>
                             <span>{formatRupees(subtotal)}</span>

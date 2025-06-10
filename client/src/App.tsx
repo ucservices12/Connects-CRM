@@ -33,13 +33,20 @@ const AddEmployee = React.lazy(() => import('./pages/employees/AddEmployee'));
 const EmployeeProfile = React.lazy(() => import('./pages/employees/EmployeeProfile'));
 const EditEmployee = React.lazy(() => import('./pages/employees/EditEmployee'));
 
-// Clients/Leads
+// Clients
 const ClientList = React.lazy(() => import('./pages/clients/ClientList'));
 const AddClient = React.lazy(() => import('./pages/clients/AddClient'));
 const AssignClient = React.lazy(() => import('./pages/clients/AssignClient'));
 
 // leads
-const LeadDashboard = React.lazy(() => import('./pages/leads/LeadDashboard'));
+const AdminLeadDashboard = React.lazy(() => import('./pages/leads/AdminLeadDashboard'));
+const LeadAnalytics = React.lazy(() => import('./pages/leads/LeadAnalytics'));
+const EmployeeLeadDashboard = React.lazy(() => import('./pages/leads/EmployeeLeadDashboard'));
+const EmployeeLeads = React.lazy(() => import('./pages/employees/EmployeeLeads'));
+const LeadDetailPage = React.lazy(() => import('./pages/leads/LeadDetailPage'));
+const LeadTargetes = React.lazy(() => import('./pages/leads/MyTargets'));
+const TotalLeads = React.lazy(() => import('./pages/leads/TotalLeads'));
+const MyActivities = React.lazy(() => import('./pages/leads/MyActivities'));
 
 // Tasks
 const CreateTask = React.lazy(() => import('./pages/tasks/CreateTask'));
@@ -225,9 +232,45 @@ function App() {
             </ProtectedRoute>
           } />
 
-          <Route path="/leads/dashboard" element={
-            <ProtectedRoute requiredRoles={['admin', 'manager']}>
-              <LeadDashboard />
+          {/* leads */}
+          <Route path="/leads/admin-board" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <AdminLeadDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="leads/analytics" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <LeadAnalytics />
+            </ProtectedRoute>
+          } />
+          <Route path="/leads/employee-board" element={
+            <ProtectedRoute requiredRoles={['employee']}>
+              <EmployeeLeadDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/leads/myLeads" element={
+            <ProtectedRoute requiredRoles={['employee']}>
+              <EmployeeLeads />
+            </ProtectedRoute>
+          } />
+          <Route path="/leads/total-leads" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <TotalLeads />
+            </ProtectedRoute>
+          } />
+          <Route path="/lead/:id" element={
+            <ProtectedRoute>
+              <LeadDetailPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/leads/my-target" element={
+            <ProtectedRoute requiredRoles={['employee']}>
+              <LeadTargetes />
+            </ProtectedRoute>
+          } />
+          <Route path="/leads/activities" element={
+            <ProtectedRoute requiredRoles={['manager']}>
+              <MyActivities />
             </ProtectedRoute>
           } />
 

@@ -326,7 +326,7 @@ const InvoiceList = () => {
                                         })}
                                     </td>
                                     <td className="py-3 px-4 text-right font-medium">
-                                        ₹{invoice?.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                        ₹{invoice?.balanceDue}
                                     </td>
                                     <td className="py-3 px-4 text-center">
                                         {getStatusBadge(invoice?.status)}
@@ -401,7 +401,7 @@ const InvoiceList = () => {
                             </div>
                             <div className="flex justify-between items-center mt-2">
                                 <span className="font-medium text-lg text-green-700">
-                                    ₹{invoice?.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    ₹{invoice?.balanceDue}
                                 </span>
                                 <div className="flex gap-2">
                                     <Link

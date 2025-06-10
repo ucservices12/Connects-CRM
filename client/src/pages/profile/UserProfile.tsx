@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
 import { User, Lock, Bell, Shield, Eye, EyeOff } from 'lucide-react';
 import { getRoleBadgeClass } from '../../components/layout/Navbar';
 import { updatePassword } from '../../machine/auth';
