@@ -326,7 +326,7 @@ const InvoiceList = () => {
                                         })}
                                     </td>
                                     <td className="py-3 px-4 text-right font-medium">
-                                        ₹{invoice?.balanceDue}
+                                        ₹{invoice?.totalAmount}
                                     </td>
                                     <td className="py-3 px-4 text-center">
                                         {getStatusBadge(invoice?.status)}

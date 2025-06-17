@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { getInvoiceById } from '../../machine/invoice';
 import { getStatusBadge } from './InvoiceList';
+import { sub } from 'date-fns';
 
 const printStyles = `
 @media print {
@@ -45,13 +46,31 @@ const InvoiceDetail = () => {
         fetchInvoiceDetails();
     }, [id]);
 
-    const total = invoiceDetails?.totalAmount + invoiceDetails?.taxAmount - invoiceDetails?.discountAmount
-    const remainingAmount = total - invoiceDetails?.paidAmount
 
+  const toTwoDecimal = (num) => Number(num.toFixed(2));
 
-    // Utility function to format amount in INR
-    const formatRupees = (amount: number) =>
-        `₹${Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    const grandTotal = toTwoDecimal(Number(invoiceDetails?.items.reduce((sum, item) => sum + item.quantity * item.rate, 0)) || 0);
+    const sGST = toTwoDecimal(Number(invoiceDetails?.sGST) || 0);
+    const cGST = sGST; // Assuming CGST = SGST
+    const discount = toTwoDecimal(Number(invoiceDetails?.discount) || 0);
+    const paidAmount = toTwoDecimal(Number(invoiceDetails?.paidAmount) || 0);
+
+    // Calculate effective multiplier
+    const effectiveMultiplier = 1 + ((sGST + cGST - discount) / 100);
+
+    // Reverse calculate subtotal
+    const subtotal = toTwoDecimal(grandTotal / effectiveMultiplier);
+
+    // Now forward calculate the rest
+    const sgstAmount = toTwoDecimal((subtotal * sGST) / 100);
+    const cgstAmount = toTwoDecimal((subtotal * cGST) / 100);
+    const discountAmount = toTwoDecimal((subtotal * discount) / 100);
+    const taxAmount = toTwoDecimal(sgstAmount + cgstAmount);
+
+    // Use the actual grandTotal as it was input
+    const balanceDue = toTwoDecimal(Math.max(grandTotal - paidAmount, 0));
+
+    const formatRupees = amount => `₹${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 
     // Utility function to format address
     const formatAddress = (address: any) => {
@@ -173,7 +192,7 @@ const InvoiceDetail = () => {
                             <div className="text-xs font-bold text-gray-700">Invoice Number</div>
                             <div className="text-gray-900 break-words">{invoiceDetails?.invoiceNo}</div>
                             <div className="text-xs font-bold text-gray-700 mt-2">Amount Due</div>
-                            <div className="text-lg font-bold text-md text-green-500">{formatRupees(remainingAmount)}</div>
+                            <div className="text-lg font-bold text-md text-green-500">{formatRupees(balanceDue)}</div>
                         </div>
                     </div>
                 </div>
@@ -211,27 +230,27 @@ const InvoiceDetail = () => {
                     <div className="w-full md:w-1/2 text-xs">
                         <div className="flex justify-between py-1">
                             <span className="text-gray-700">Subtotal</span>
-                            <span className="font-semibold">{formatRupees(invoiceDetails?.totalAmount)}</span>
+                            <span className="font-semibold">{formatRupees(subtotal)}</span>
                         </div>
                         <div className="flex justify-between py-1">
                             <span className="text-gray-700">SGST ({invoiceDetails?.sGST}%)</span>
-                            <span className="font-semibold">{formatRupees(invoiceDetails?.sgstAmount)}</span>
+                            <span className="font-semibold">{formatRupees(sgstAmount)}</span>
                         </div>
                         <div className="flex justify-between py-1">
                             <span className="text-gray-700">CGST ({invoiceDetails?.cGST}%)</span>
-                            <span className="font-semibold">{formatRupees(invoiceDetails?.cgstAmount)}</span>
+                            <span className="font-semibold">{formatRupees(cgstAmount)}</span>
                         </div>
                         <div className="flex justify-between py-1">
                             <span className="text-gray-700">GST Tax ({invoiceDetails?.tax}%)</span>
-                            <span className="font-semibold">+{formatRupees(invoiceDetails?.taxAmount)}</span>
+                            <span className="font-semibold">+{formatRupees(taxAmount)}</span>
                         </div>
                         <div className="flex justify-between py-1">
                             <span className="text-gray-700">Discount ({invoiceDetails?.discount}%)</span>
-                            <span className="font-semibold text-green-700">-{formatRupees(invoiceDetails?.discountAmount)}</span>
+                            <span className="font-semibold text-green-700">-{formatRupees(discountAmount)}</span>
                         </div>
                         <div className="flex justify-between py-2 font-bold border-t border-gray-200 mt-2 text-md">
                             <span>Total</span>
-                            <span>{formatRupees(total)}</span>
+                            <span>{formatRupees(grandTotal)}</span>
                         </div>
                         <div className="flex justify-between pb-2 border-b-2 border-indigo-600 font-semibold">
                             <span>Paid</span>
@@ -239,7 +258,7 @@ const InvoiceDetail = () => {
                         </div>
                         <div className="flex justify-between pt-1 font-bold text-indigo-700 text-md">
                             <span>Balance Due</span>
-                            <span>{formatRupees(invoiceDetails?.balanceDue)}</span>
+                            <span>{formatRupees(balanceDue)}</span>
                         </div>
                     </div>
                 </div>
